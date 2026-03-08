@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+
+# Local instance and secrets
+instance/config.py
+instance/*.db
+instance/*.sqlite
+instance/*.sqlite3
+
+# Uploaded files
+static/uploads/*
+!static/uploads/.gitkeep
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/

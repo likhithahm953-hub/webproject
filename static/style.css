@@ -1,0 +1,339 @@
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Hero Section */
+.landing-page {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', sans-serif;
+    position: relative;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    color: white;
+    text-align: center;
+}
+
+/* Background layer */
+.bg-layer {
+    position: absolute;
+    inset: 0;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background: url('/static/bg1.jpeg') no-repeat center center;
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    transition: opacity 1s ease-in-out;
+    z-index: 0;
+    opacity: 1;
+}
+
+/* Overlay removed so background images appear without dark tint */
+/* .landing-page::before removed intentionally */
+
+/* Ensure content sits above overlay */
+.center-content, .scroll-btn {
+    position: relative;
+    z-index: 2;
+}
+
+/* Black overlay placed on top of background but below content */
+.landing-page::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* Force hero title and quote to white so error styles (red) don't affect them */
+.landing-page {
+    color: #ffffff !important;
+}
+.landing-page .main-title,
+.landing-page .quote {
+    color: #ffffff !important;
+}
+/* Center content exactly in middle */
+.center-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* vertical center */
+    align-items: center;     /* horizontal center */
+}
+
+.main-title {
+    font-size: 3.5rem;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 20px;
+}
+
+.quote {
+    font-style: italic;
+    color: #f0f0f0;
+    margin-bottom: 30px;
+}
+
+/* Buttons */
+.buttons {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-bottom: 60px; /* space before scroll button */
+}
+
+.btn {
+    padding: 14px 35px;
+    border: 2px solid white;
+    border-radius: 6px; /* box shape */
+    text-decoration: none;
+    font-weight: bold;
+}
+
+/* Login button */
+.login-btn {
+    background: white;
+    color: skyblue;
+}
+.signup-btn {
+    background: skyblue;
+    color: white;
+}
+
+/* Scroll button capsule style with bounce animation */
+.scroll-btn {
+    margin-bottom: 40px;
+}
+.scroll-link {
+    color: white;
+    border: 2px solid white;
+    padding: 12px 40px;
+    border-radius: 50px; /* capsule shape */
+    text-decoration: none;
+    font-weight: bold;
+    opacity: 0.9;
+    animation: bounce 2s infinite;
+    display: inline-block;
+}
+.scroll-link:hover {
+    transform: scale(1.05);
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+
+/* About Section */
+.about-section {
+    min-height: 100vh;
+    background: #111;
+    color: white;
+    padding: 60px 20px;
+    text-align: center;
+    opacity: 0;
+    transform: scale(0.9) translateY(40px);
+    transition: opacity 1s ease, transform 1s ease;
+}
+
+.about-section.visible {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.about-section h2 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+.subtitle {
+    font-size: 1.2rem;
+    margin-bottom: 40px;
+    color: #ccc;
+}
+.features {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+.feature-box {
+    background: rgba(255,255,255,0.1);
+    padding: 20px;
+    border-radius: 10px;
+    width: 250px;
+    box-shadow: 0 0 15px rgba(0,255,255,0.3);
+    font-size: 1rem;
+    text-align: left;
+    transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+.feature-box strong {
+    display: block;
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    color: #00ffff;
+}
+.feature-box:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(0,255,255,0.6);
+}
+
+/* Form page styles */
+.form-page {
+    background: linear-gradient(180deg, rgba(10,10,10,1), rgba(20,20,20,1));
+    min-height: 100vh;
+    color: white;
+}
+.form-container {
+    max-width: 440px;
+    margin: 80px auto;
+    background: rgba(255,255,255,0.03);
+    padding: 30px;
+    border-radius: 12px;
+    color: white;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+.form-container input {
+    width: 100%;
+    padding: 12px 14px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02);
+    color: #fff;
+}
+.input-group { position: relative; }
+.input-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 1.1rem; pointer-events:none; }
+.input-group input { padding-left: 40px; }
+.pw-row { display:flex; gap:8px; align-items:center; position:relative; }
+.pw-row input { flex:1; padding-right:48px; }
+.toggle-password { background:transparent; border:1px solid rgba(255,255,255,0.08); padding:8px 10px; border-radius:8px; color:#00ffff; cursor:pointer; }
+.error { color: #ff6b6b; min-height: 20px; margin-bottom:12px; }
+#email-hint { font-size: 0.9rem; color: #ccc; margin-top: -6px; margin-bottom: 8px; }
+#email-hint.valid { color: #50fa7b; }
+#email-hint.invalid { color: #ff6b6b; }
+#password-strength { margin-bottom:12px; text-align:left; }
+.strength-bar { height:8px; background:#222; border-radius:6px; overflow:hidden; }
+.strength-bar > div { height:100%; width:0%; border-radius:6px; transition: width 0.25s ease, background 0.25s ease; }
+.strength-text { font-size:0.9rem; color:#ccc; margin-top:6px; }
+
+/* Password inline error (shows immediately under password inputs) */
+#pw-inline-errors { color: #ff6b6b; margin-top: 10px; margin-bottom: 8px; font-size: 0.95rem; min-height: 18px; }
+
+/* keep global inline errors near submit for non-password errors */
+#inline-errors { color: #ff6b6b; margin-top: 6px; margin-bottom: 12px; min-height: 18px; }
+
+/* Password rule list (hidden until needed) with fade animation and professional look */
+.pw-rules {
+    text-align:left;
+    margin:8px 0 12px 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.18s ease, transform 0.18s ease, max-height 0.25s ease;
+    border: 1px solid rgba(255,107,107,0.9); /* red border */
+    background: rgba(255,80,80,0.03); /* subtle red tint */
+    padding: 12px; 
+    border-radius: 8px;
+}
+.pw-rules.visible {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 400px; /* allow it to expand */
+}
+.pw-rules .pw-header { display:flex; gap:10px; align-items:center; margin-bottom:8px; color:#ff6b6b; }
+.pw-rules .pw-header .lock-icon { font-size:1.1rem; }
+.pw-rules .pw-list { list-style:none; padding:0; margin:0; }
+.pw-rules .rule { padding:8px 10px; border-radius:6px; background: transparent; margin:6px 0; color:#b94a4a; display:flex; gap:10px; align-items:center; font-size:0.95rem; }
+.pw-rules .rule.valid { color:#2f8f52; }
+.pw-rules .rule .rule-icon { display:inline-block; width:18px; text-align:center; font-weight:bold; color: #e74c3c; }
+.pw-rules .rule.valid .rule-icon { color: #50fa7b; }
+
+
+/* Inline error fades */
+#pw-inline-errors, #confirm-inline-errors { opacity: 1; transition: opacity 0.18s ease; }
+#pw-inline-errors.hidden, #confirm-inline-errors.hidden { opacity: 0; }
+
+/* Inline register confirmation (appears below Register button) */
+.register-result { margin-top: 12px; font-size: 0.95rem; padding: 10px; border-radius: 8px; text-align: center; }
+.register-result.success { background: rgba(80,250,123,0.06); color: #50fa7b; border: 1px solid rgba(80,250,123,0.12); }
+.register-result.warning { background: rgba(255,184,107,0.06); color: #ffb86b; border: 1px solid rgba(255,184,107,0.12); }
+
+/* Toggle password button: positioned inside the input */
+.toggle-password { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:transparent; border:none; padding:6px; border-radius:6px; color:#cfeffd; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.toggle-password svg { display:block; }
+.toggle-password:focus { outline: 2px solid rgba(0,255,255,0.12); }
+.captcha-group { text-align:left; margin:8px 0 14px; }
+.captcha-group label { display:block; color:#ccc; margin-bottom:6px; }
+.captcha-group input { width: 100%; padding: 10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); color:#fff; }
+
+
+/* Flash messages */
+.flashes { position: fixed; top: 12px; right: 12px; z-index: 9999; display:flex; flex-direction: column; gap:8px; }
+.flash { padding: 10px 14px; border-radius: 8px; color: #fff; min-width: 180px; }
+.flash.success { background: #2ecc71; }
+.flash.error { background: #e74c3c; }
+
+/* Responsive Design for Backgrounds */
+@media (max-width: 768px) {
+    .bg-layer {
+        background-attachment: scroll;
+    }
+    
+    .main-title {
+        font-size: 2.5rem;
+    }
+    
+    .quote {
+        font-size: 1rem;
+    }
+    
+    .buttons {
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+    
+    .btn {
+        padding: 12px 25px;
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .bg-layer {
+        background-attachment: scroll;
+    }
+    
+    .main-title {
+        font-size: 2rem;
+    }
+    
+    .quote {
+        font-size: 0.9rem;
+    }
+    
+    .buttons {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .btn {
+        width: 100%;
+        max-width: 250px;
+        padding: 12px 20px;
+    }
+}

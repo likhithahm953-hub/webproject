@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Welcome to SkillForge</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        // Image list injected from server (first 3 only) so rotator uses the images you want
+        window.landingImages = [
+            "{{ url_for('static', filename='bg1.jpeg') }}",
+            "{{ url_for('static', filename='bg2.jpeg') }}",
+            "{{ url_for('static', filename='bg3.jpeg') }}"
+        ];
+    </script>
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</head>
+<body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flashes">
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+    <!-- Hero Section -->
+    <section class="landing-page" id="home">
+        <div class="bg-layer" aria-hidden="true"></div>
+        <div class="center-content">
+            <h1 class="main-title">Welcome to SkillForge</h1>
+            <p class="quote">"Experience learning like never before."</p>
+            <div class="buttons">
+                <a href="/login" class="btn login-btn">Login</a>
+                <a href="/signup" class="btn signup-btn">Sign Up</a>
+            </div>
+        </div>
+        <!-- Scroll button at bottom -->
+        <div class="scroll-btn">
+            <a href="#about" class="scroll-link">↓ Scroll</a>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about-section visible">
+        <h2>Why Choose SkillForge?</h2>
+        <p class="subtitle">Your one-stop hub for tech learning.</p>
+        <div class="features">
+            <div class="feature-box">
+                <strong>📘 Learn Multiple Domains</strong>
+                <p>Master Python, Web Development, Machine Learning, Data Science, and more — all in one platform.</p>
+            </div>
+            <div class="feature-box">
+                <strong>⚡ Interactive Challenges</strong>
+                <p>Practice with real-time coding tasks and quizzes designed to sharpen your skills step by step.</p>
+            </div>
+            <div class="feature-box">
+                <strong>🏆 Certificates & AI Guidance</strong>
+                <p>Earn certificates for completed courses and get personalized recommendations powered by AI.</p>
+            </div>
+        </div>
+    </section>
+</body>
+</html>

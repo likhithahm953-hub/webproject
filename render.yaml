@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: skillforge
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/database.db
+      - key: DATA_DIR
+        value: /var/data
+      - key: LAUNCH_PIPELINE_TIMEOUT_SECONDS
+        value: 5
+      - key: TEST_ALERT_INTERVAL_MINUTES
+        value: 300
+      - key: COURSE_COMPLETION_MINUTES
+        value: 300
+      - key: QUIZ_PASS_THRESHOLD
+        value: 70
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: SMTP_ALLOW_INSECURE
+        value: "false"
+      - key: GEMINI_API_KEY
+        sync: false
+    disks:
+      - name: skillforge-data
+        mountPath: /var/data
+        sizeGB: 1

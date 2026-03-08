@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+      (function() {
+        try {
+          const theme = localStorage.getItem('theme') || 'dark';
+          if (theme === 'light') {
+            document.documentElement.classList.add('light');
+          } else if (theme === 'auto') {
+            const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+            if (prefersLight) document.documentElement.classList.add('light');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  <title>Settings - SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='settings.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Animated Background -->
+  <div class="animated-bg"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <i class="fa-solid fa-graduation-cap"></i>
+        <span class="logo-text">SkillForge</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebar-toggle">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="/dashboard" class="nav-item">
+        <i class="fa-solid fa-home"></i>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <a href="/domains" class="nav-item">
+        <i class="fa-solid fa-book"></i>
+        <span class="nav-text">Domains</span>
+      </a>
+      <a href="/challenges" class="nav-item">
+        <i class="fa-solid fa-code"></i>
+        <span class="nav-text">Challenges</span>
+      </a>
+      <a href="/certificates" class="nav-item">
+        <i class="fa-solid fa-certificate"></i>
+        <span class="nav-text">Certificates</span>
+      </a>
+      <a href="/ai-guidance" class="nav-item">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span class="nav-text">AI Guidance</span>
+      </a>
+      <a href="/profile" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span class="nav-text">Profile</span>
+      </a>
+      <a href="/settings" class="nav-item active">
+        <i class="fa-solid fa-gear"></i>
+        <span class="nav-text">Settings</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <a href="/logout" class="nav-item">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span class="nav-text">Logout</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="hero-welcome">
+          <h2>Settings</h2>
+          <p>Manage your account and application preferences</p>
+        </div>
+      </div>
+      
+      <div class="topbar-right">
+        <button class="topbar-icon" id="settings-icon">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+        <div class="profile-menu">
+          <div class="avatar" id="profile-avatar">
+            {% if user and user.avatar %}
+              <img src="{{ url_for('static', filename='uploads/' + user.avatar) }}" alt="Profile">
+            {% else %}
+              {{ user.username[0]|upper if user else 'U' }}
+            {% endif %}
+          </div>
+          <div class="dropdown-menu" id="profile-dropdown">
+            <a href="/profile"><i class="fa-solid fa-user"></i> Profile</a>
+            <a href="/settings"><i class="fa-solid fa-cog"></i> Settings</a>
+            <a href="/logout"><i class="fa-solid fa-sign-out-alt"></i> Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+    
+    <!-- Accent Bar -->
+    <div class="profile-top-accent"></div>
+
+    <!-- Settings Content -->
+    <div class="settings-container">
+      <!-- Settings Categories -->
+      <div class="settings-sidebar">
+        <div class="settings-category active" data-category="general">
+          <i class="fa-solid fa-sliders"></i>
+          <span>General</span>
+        </div>
+        <div class="settings-category" data-category="account">
+          <i class="fa-solid fa-user-gear"></i>
+          <span>Account</span>
+        </div>
+        <div class="settings-category" data-category="privacy">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>Privacy & Security</span>
+        </div>
+        <div class="settings-category" data-category="notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span>Notifications</span>
+        </div>
+        <div class="settings-category" data-category="appearance">
+          <i class="fa-solid fa-palette"></i>
+          <span>Appearance</span>
+        </div>
+        <div class="settings-category" data-category="integrations">
+          <i class="fa-solid fa-puzzle-piece"></i>
+          <span>Integrations</span>
+        </div>
+        <div class="settings-category" data-category="billing">
+          <i class="fa-solid fa-credit-card"></i>
+          <span>Billing</span>
+        </div>
+        <div class="settings-category" data-category="advanced">
+          <i class="fa-solid fa-code"></i>
+          <span>Advanced</span>
+        </div>
+      </div>
+
+      <!-- Settings Panel -->
+      <div class="settings-panel">
+        <!-- General Settings -->
+        <div class="settings-section active" id="general-section">
+          <h3 class="section-title">General Settings</h3>
+          
+          <div class="settings-card">
+            <div class="settings-group">
+              <label class="settings-label">Language</label>
+              <select class="settings-select">
+                <option value="en" selected>English</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="zh">中文</option>
+              </select>
+              <p class="settings-help">Choose your preferred language</p>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Timezone</label>
+              <select class="settings-select">
+                <option value="utc">UTC</option>
+                <option value="pst" selected>Pacific Time (PT)</option>
+                <option value="est">Eastern Time (ET)</option>
+                <option value="gmt">Greenwich Mean Time (GMT)</option>
+                <option value="ist">India Standard Time (IST)</option>
+              </select>
+              <p class="settings-help">Your local timezone for date and time display</p>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Date Format</label>
+              <select class="settings-select">
+                <option value="mdy" selected>MM/DD/YYYY</option>
+                <option value="dmy">DD/MM/YYYY</option>
+                <option value="ymd">YYYY-MM-DD</option>
+              </select>
+            </div>
+
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Auto-save Progress</label>
+                  <p class="settings-help">Automatically save your course progress</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Account Settings -->
+        <div class="settings-section" id="account-section">
+          <h3 class="section-title">Account Settings</h3>
+          
+          <div class="settings-card">
+            <div class="settings-group">
+              <label class="settings-label">Email Address</label>
+              <input type="email" class="settings-input" value="{{ session.get('email', 'user@example.com') }}" readonly>
+              <button class="settings-btn-secondary" onclick="openModal('changeEmailModal')">Change Email</button>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Password</label>
+              <input type="password" class="settings-input" value="••••••••" readonly>
+              <button class="settings-btn-secondary" onclick="openModal('changePasswordModal')">Change Password</button>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Username</label>
+              <input type="text" class="settings-input" value="{{ session.get('username', 'user') }}" readonly>
+              <button class="settings-btn-primary" onclick="openModal('changeUsernameModal')">Update Username</button>
+            </div>
+          </div>
+
+          <div class="settings-card danger-zone">
+            <h4 class="card-title">Danger Zone</h4>
+            <div class="settings-group">
+              <div>
+                <label class="settings-label">Delete Account</label>
+                <p class="settings-help">Permanently delete your account and all data</p>
+              </div>
+              <button class="settings-btn-danger">Delete Account</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Privacy & Security -->
+        <div class="settings-section" id="privacy-section">
+          <h3 class="section-title">Privacy & Security</h3>
+          
+          <div class="settings-card">
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Two-Factor Authentication</label>
+                  <p class="settings-help">Add an extra layer of security to your account</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Profile Visibility</label>
+                  <p class="settings-help">Make your profile visible to other users</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Show Activity Status</label>
+                  <p class="settings-help">Let others see when you're online</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Active Sessions</label>
+              <div class="sessions-list">
+                <div class="session-item">
+                  <div class="session-icon"><i class="fa-solid fa-desktop"></i></div>
+                  <div class="session-info">
+                    <p class="session-device">Windows PC - Chrome</p>
+                    <p class="session-location">New York, USA • Active now</p>
+                  </div>
+                  <button class="session-revoke">Current</button>
+                </div>
+                <div class="session-item">
+                  <div class="session-icon"><i class="fa-solid fa-mobile"></i></div>
+                  <div class="session-info">
+                    <p class="session-device">iPhone - Safari</p>
+                    <p class="session-location">New York, USA • 2 days ago</p>
+                  </div>
+                  <button class="session-revoke">Revoke</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notifications Settings -->
+        <div class="settings-section" id="notifications-section">
+          <h3 class="section-title">Notification Preferences</h3>
+          
+          <div class="settings-card">
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Email Notifications</label>
+                  <p class="settings-help">Receive notifications via email</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Course Updates</label>
+                  <p class="settings-help">Get notified about new course content</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Challenge Reminders</label>
+                  <p class="settings-help">Remind me about pending challenges</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Achievement Notifications</label>
+                  <p class="settings-help">Celebrate your achievements</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Weekly Summary</label>
+                  <p class="settings-help">Receive a weekly learning summary</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Appearance Settings -->
+        <div class="settings-section" id="appearance-section">
+          <h3 class="section-title">Appearance</h3>
+          
+          <div class="settings-card">
+            <div class="settings-group">
+              <label class="settings-label">Theme</label>
+              <div class="theme-options">
+                <button class="theme-option" data-theme="dark">
+                  <i class="fa-solid fa-moon"></i>
+                  <span>Dark</span>
+                </button>
+                <button class="theme-option active" data-theme="light">
+                  <i class="fa-solid fa-sun"></i>
+                  <span>Light</span>
+                </button>
+                <button class="theme-option" data-theme="auto">
+                  <i class="fa-solid fa-circle-half-stroke"></i>
+                  <span>Auto</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Accent Color</label>
+              <div class="color-picker">
+                <button class="color-option active" style="background: #6366f1;"></button>
+                <button class="color-option" style="background: #8b5cf6;"></button>
+                <button class="color-option" style="background: #ec4899;"></button>
+                <button class="color-option" style="background: #f43f5e;"></button>
+                <button class="color-option" style="background: #10b981;"></button>
+                <button class="color-option" style="background: #3b82f6;"></button>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Animations</label>
+                  <p class="settings-help">Enable smooth animations</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Integrations Settings -->
+        <div class="settings-section" id="integrations-section">
+          <h3 class="section-title">Integrations</h3>
+          
+          <div class="settings-card">
+            <div class="integration-item">
+              <div class="integration-icon" style="background: #1DA1F2;">
+                <i class="fa-brands fa-github"></i>
+              </div>
+              <div class="integration-info">
+                <h4>GitHub</h4>
+                <p>Connect your GitHub account for code challenges</p>
+              </div>
+              <button class="settings-btn-primary">Connect</button>
+            </div>
+
+            <div class="integration-item">
+              <div class="integration-icon" style="background: #0077B5;">
+                <i class="fa-brands fa-linkedin"></i>
+              </div>
+              <div class="integration-info">
+                <h4>LinkedIn</h4>
+                <p>Share your certificates on LinkedIn</p>
+              </div>
+              <button class="settings-btn-primary">Connect</button>
+            </div>
+
+            <div class="integration-item">
+              <div class="integration-icon" style="background: #EA4335;">
+                <i class="fa-brands fa-google"></i>
+              </div>
+              <div class="integration-info">
+                <h4>Google Calendar</h4>
+                <p>Sync your course schedule</p>
+              </div>
+              <button class="settings-btn-primary">Connect</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Billing Settings -->
+        <div class="settings-section" id="billing-section">
+          <h3 class="section-title">Billing & Subscription</h3>
+          
+          <div class="settings-card">
+            <div class="subscription-status">
+              <div class="status-badge pro">PRO MEMBER</div>
+              <h4>Premium Plan</h4>
+              <p>$19.99/month • Renews on Jan 15, 2025</p>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Payment Method</label>
+              <div class="payment-method">
+                <div class="payment-icon"><i class="fa-brands fa-cc-visa"></i></div>
+                <div>
+                  <p>•••• •••• •••• 4242</p>
+                  <p class="payment-expires">Expires 12/2025</p>
+                </div>
+                <button class="settings-btn-secondary">Update</button>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Billing History</label>
+              <div class="billing-history">
+                <div class="billing-item">
+                  <span>Dec 15, 2024</span>
+                  <span>Premium Plan</span>
+                  <span class="billing-amount">$19.99</span>
+                  <button class="download-invoice"><i class="fa-solid fa-download"></i></button>
+                </div>
+                <div class="billing-item">
+                  <span>Nov 15, 2024</span>
+                  <span>Premium Plan</span>
+                  <span class="billing-amount">$19.99</span>
+                  <button class="download-invoice"><i class="fa-solid fa-download"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Settings -->
+        <div class="settings-section" id="advanced-section">
+          <h3 class="section-title">Advanced Settings</h3>
+          
+          <div class="settings-card">
+            <div class="settings-group">
+              <label class="settings-label">API Key</label>
+              <div class="api-key-box">
+                <input type="text" class="settings-input" value="Not configured" readonly>
+                <button class="copy-btn"><i class="fa-solid fa-copy"></i></button>
+              </div>
+              <button class="settings-btn-secondary">Regenerate API Key</button>
+            </div>
+
+            <div class="settings-group">
+              <div class="settings-toggle-group">
+                <div>
+                  <label class="settings-label">Developer Mode</label>
+                  <p class="settings-help">Enable advanced developer features</p>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label">Data Export</label>
+              <p class="settings-help">Download all your data in JSON format</p>
+              <button class="settings-btn-primary">Export Data</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- AI Chatbot Widget -->
+  {% include 'ai_chatbot.html' %}
+
+  <!-- Change Email Modal -->
+  <div class="modal" id="changeEmailModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Change Email Address</h3>
+        <button class="modal-close" onclick="closeModal('changeEmailModal')">&times;</button>
+      </div>
+      <form id="changeEmailForm">
+        <div class="form-group">
+          <label>Current Email</label>
+          <input type="email" value="{{ session.get('email', '') }}" readonly>
+        </div>
+        <div class="form-group">
+          <label>New Email Address</label>
+          <input type="email" id="newEmail" name="newEmail" required>
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" id="emailPassword" name="password" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('changeEmailModal')">Cancel</button>
+          <button type="submit" class="btn-primary">Update Email</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Change Password Modal -->
+  <div class="modal" id="changePasswordModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Change Password</h3>
+        <button class="modal-close" onclick="closeModal('changePasswordModal')">&times;</button>
+      </div>
+      <form id="changePasswordForm">
+        <div class="form-group">
+          <label>Current Password</label>
+          <input type="password" id="currentPassword" name="currentPassword" required>
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <input type="password" id="newPassword" name="newPassword" required>
+          <small>At least 8 characters, 1 uppercase, 1 digit, 1 symbol</small>
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <input type="password" id="confirmPassword" name="confirmPassword" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('changePasswordModal')">Cancel</button>
+          <button type="submit" class="btn-primary">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Change Username Modal -->
+  <div class="modal" id="changeUsernameModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Update Username</h3>
+        <button class="modal-close" onclick="closeModal('changeUsernameModal')">&times;</button>
+      </div>
+      <form id="changeUsernameForm">
+        <div class="form-group">
+          <label>Current Username</label>
+          <input type="text" value="{{ session.get('username', '') }}" readonly>
+        </div>
+        <div class="form-group">
+          <label>New Username</label>
+          <input type="text" id="newUsername" name="newUsername" required minlength="3">
+          <small>At least 3 characters, letters, numbers, and underscores only</small>
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" id="usernamePassword" name="password" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('changeUsernameModal')">Cancel</button>
+          <button type="submit" class="btn-primary">Update Username</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+  <script src="{{ url_for('static', filename='settings.js') }}"></script>
+</body>
+</html>

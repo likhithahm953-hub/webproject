@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script>
+    (function() {
+      try {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'light') {
+          document.documentElement.classList.add('light');
+        } else if (theme === 'auto') {
+          const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          if (prefersLight) document.documentElement.classList.add('light');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <title>Profile Settings — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='profile.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+  <!-- Animated Background -->
+  <div class="animated-bg"></div>
+
+  <!-- Sidebar (reuse from dashboard) -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <h2><i class="fa-solid fa-hammer"></i> SkillForge</h2>
+      <button id="sidebar-toggle" aria-label="Toggle sidebar" class="toggle-btn">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+    
+    <nav class="nav">
+      <a href="/dashboard" class="nav-item">
+        <i class="fa-solid fa-chart-line"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="/domains" class="nav-item">
+        <i class="fa-solid fa-book"></i>
+        <span>Domains</span>
+      </a>
+      <a href="/challenges" class="nav-item">
+        <i class="fa-solid fa-bolt"></i>
+        <span>Challenges</span>
+      </a>
+      <a href="/certificates" class="nav-item">
+        <i class="fa-solid fa-trophy"></i>
+        <span>Certificates</span>
+      </a>
+      <a href="/ai-guidance" class="nav-item">
+        <i class="fa-solid fa-robot"></i>
+        <span>AI Guidance</span>
+      </a>
+      <a href="/profile" class="nav-item active">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <i class="fa-solid fa-gear"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+    
+    <div class="sidebar-footer">
+      <button id="theme-toggle" class="theme-btn" aria-pressed="false" title="Toggle theme">
+        <i class="fa-solid fa-moon"></i>
+        <i class="fa-solid fa-sun"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Container -->
+  <div class="container">
+    <!-- Top Navigation Bar -->
+    <header class="topbar">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">Profile Settings</h1>
+        <p class="tagline">Manage your account and preferences</p>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn notification-btn" title="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span class="badge">3</span>
+        </button>
+        <div class="profile-menu">
+          <div class="avatar" id="profile-avatar">
+            {% if user and user.avatar %}
+              <img src="{{ url_for('static', filename='uploads/' ~ user.avatar) }}" alt="avatar" />
+            {% else %}
+              {{ user.username[0]|upper if user else 'U' }}
+            {% endif %}
+          </div>
+          <div class="dropdown-menu" id="profile-dropdown">
+            <a href="/profile"><i class="fa-solid fa-user"></i> Profile</a>
+            <a href="/settings"><i class="fa-solid fa-cog"></i> Settings</a>
+            <a href="/logout"><i class="fa-solid fa-sign-out-alt"></i> Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Profile Content -->
+    <main class="dash-main">
+      <div class="profile-container">
+        
+        <!-- Profile Header Card -->
+        <section class="profile-header-card fade-in">
+          <div class="profile-banner">
+            <div class="banner-gradient"></div>
+          </div>
+          <div class="profile-header-content">
+            <div class="profile-avatar-large">
+              {% if user and user.avatar %}
+                <img src="{{ url_for('static', filename='uploads/' ~ user.avatar) }}" alt="avatar" />
+              {% else %}
+                <span class="avatar-initial">{{ user.username[0]|upper if user else 'U' }}</span>
+              {% endif %}
+              <button class="edit-avatar-btn" id="edit-avatar-trigger">
+                <i class="fa-solid fa-camera"></i>
+              </button>
+            </div>
+            <div class="profile-header-info">
+              <h2 class="profile-name">{{ user.username if user else 'User' }}</h2>
+              <p class="profile-email">
+                <i class="fa-solid fa-envelope"></i> {{ user.email if user else 'user@example.com' }}
+              </p>
+              <p class="profile-tagline" id="profile-tagline">
+                "Forging skills, building futures ✨"
+              </p>
+              <div class="profile-stats">
+                <div class="stat-item">
+                  <span class="stat-value">24</span>
+                  <span class="stat-label">Courses</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-value">156</span>
+                  <span class="stat-label">Hours</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-value">8</span>
+                  <span class="stat-label">Certificates</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Settings Tabs -->
+        <div class="settings-tabs">
+          <button class="settings-tab active" data-tab="personal">
+            <i class="fa-solid fa-user"></i> Personal Info
+          </button>
+          <button class="settings-tab" data-tab="security">
+            <i class="fa-solid fa-shield-halved"></i> Security
+          </button>
+          <button class="settings-tab" data-tab="preferences">
+            <i class="fa-solid fa-sliders"></i> Preferences
+          </button>
+          <button class="settings-tab" data-tab="notifications">
+            <i class="fa-solid fa-bell"></i> Notifications
+          </button>
+          <button class="settings-tab" data-tab="privacy">
+            <i class="fa-solid fa-lock"></i> Privacy
+          </button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="settings-content">
+          
+          <!-- Personal Info Tab -->
+          <div class="settings-panel active" id="personal">
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-id-card"></i> Personal Information
+              </h3>
+              <form class="settings-form" id="personal-info-form">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" class="form-input" value="{{ user.username if user else '' }}" readonly />
+                    <small class="form-hint">Username cannot be changed</small>
+                  </div>
+                  <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" class="form-input" placeholder="Enter your full name" value="Likhitha" />
+                  </div>
+                </div>
+                
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" class="form-input" value="{{ user.email if user else '' }}" />
+                  </div>
+                  <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" class="form-input" placeholder="+1 (555) 123-4567" />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>Bio / Tagline</label>
+                  <textarea class="form-input" rows="3" placeholder="Tell us about yourself...">Passionate learner, coding enthusiast, building amazing things!</textarea>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Date of Birth</label>
+                    <input type="date" class="form-input" />
+                  </div>
+                  <div class="form-group">
+                    <label>Location</label>
+                    <input type="text" class="form-input" placeholder="City, Country" />
+                  </div>
+                </div>
+
+                <div class="form-actions">
+                  <button type="submit" class="btn-capsule primary">
+                    <i class="fa-solid fa-save"></i> Save Changes
+                  </button>
+                  <button type="button" class="btn-capsule">
+                    <i class="fa-solid fa-rotate-left"></i> Reset
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Upload Avatar Section -->
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-image"></i> Profile Picture
+              </h3>
+              <form method="POST" enctype="multipart/form-data" class="avatar-upload-form">
+                <div class="avatar-upload-area">
+                  <div class="current-avatar">
+                    {% if user and user.avatar %}
+                      <img src="{{ url_for('static', filename='uploads/' ~ user.avatar) }}" alt="avatar" />
+                    {% else %}
+                      <span class="avatar-initial-large">{{ user.username[0]|upper if user else 'U' }}</span>
+                    {% endif %}
+                  </div>
+                  <div class="avatar-upload-controls">
+                    <label class="btn-capsule primary">
+                      <i class="fa-solid fa-upload"></i> Choose Image
+                      <input type="file" name="avatar" accept="image/*" style="display: none;" id="avatar-input" />
+                    </label>
+                    <button type="submit" class="btn-capsule">
+                      <i class="fa-solid fa-check"></i> Upload
+                    </button>
+                    <p class="form-hint">Max file size: 5MB. Accepted: JPG, PNG, GIF</p>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Security Tab -->
+          <div class="settings-panel" id="security">
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-key"></i> Change Password
+              </h3>
+              <form class="settings-form">
+                <div class="form-group">
+                  <label>Current Password</label>
+                  <input type="password" class="form-input" placeholder="Enter current password" />
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>New Password</label>
+                    <input type="password" class="form-input" placeholder="Enter new password" />
+                  </div>
+                  <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" class="form-input" placeholder="Confirm new password" />
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" class="btn-capsule primary">
+                    <i class="fa-solid fa-lock"></i> Update Password
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Two-Factor Authentication -->
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-shield-halved"></i> Two-Factor Authentication
+              </h3>
+              <div class="security-feature">
+                <div class="feature-info">
+                  <h4>Enable 2FA</h4>
+                  <p>Add an extra layer of security to your account with two-factor authentication</p>
+                  <span class="status-badge disabled">
+                    <i class="fa-solid fa-circle-xmark"></i> Disabled
+                  </span>
+                </div>
+                <button class="btn-capsule primary">
+                  <i class="fa-solid fa-shield-halved"></i> Enable 2FA
+                </button>
+              </div>
+            </div>
+
+            <!-- Last Login Activity -->
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-clock-rotate-left"></i> Recent Login Activity
+              </h3>
+              <div class="activity-list">
+                <div class="activity-entry">
+                  <div class="activity-icon">
+                    <i class="fa-solid fa-desktop"></i>
+                  </div>
+                  <div class="activity-details">
+                    <h4>Windows - Chrome Browser</h4>
+                    <p>127.0.0.1 • February 4, 2026 at 10:30 AM</p>
+                    <span class="current-badge">Current Session</span>
+                  </div>
+                </div>
+                <div class="activity-entry">
+                  <div class="activity-icon">
+                    <i class="fa-solid fa-mobile-screen"></i>
+                  </div>
+                  <div class="activity-details">
+                    <h4>iPhone - Safari</h4>
+                    <p>192.168.1.45 • February 3, 2026 at 8:15 PM</p>
+                  </div>
+                  <button class="btn-icon" title="Revoke">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+                <div class="activity-entry">
+                  <div class="activity-icon">
+                    <i class="fa-solid fa-tablet"></i>
+                  </div>
+                  <div class="activity-details">
+                    <h4>iPad - Safari</h4>
+                    <p>192.168.1.89 • February 2, 2026 at 3:45 PM</p>
+                  </div>
+                  <button class="btn-icon" title="Revoke">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+              </div>
+              <button class="btn-capsule" style="margin-top: 16px;">
+                <i class="fa-solid fa-right-from-bracket"></i> Sign Out All Devices
+              </button>
+            </div>
+          </div>
+
+          <!-- Preferences Tab -->
+          <div class="settings-panel" id="preferences">
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-palette"></i> Appearance
+              </h3>
+              <div class="preference-group">
+                <div class="preference-item">
+                  <div class="preference-info">
+                    <h4>Theme</h4>
+                    <p>Choose your preferred color scheme</p>
+                  </div>
+                  <div class="theme-selector">
+                    <button class="theme-option active" data-theme="dark">
+                      <i class="fa-solid fa-moon"></i>
+                      <span>Dark</span>
+                    </button>
+                    <button class="theme-option" data-theme="light">
+                      <i class="fa-solid fa-sun"></i>
+                      <span>Light</span>
+                    </button>
+                    <button class="theme-option" data-theme="auto">
+                      <i class="fa-solid fa-circle-half-stroke"></i>
+                      <span>Auto</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-language"></i> Language & Region
+              </h3>
+              <form class="settings-form">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Language</label>
+                    <select class="form-input">
+                      <option>English</option>
+                      <option>Spanish</option>
+                      <option>French</option>
+                      <option>German</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Timezone</label>
+                    <select class="form-input">
+                      <option>UTC-05:00 (Eastern Time)</option>
+                      <option>UTC+00:00 (GMT)</option>
+                      <option>UTC+01:00 (Central European)</option>
+                    </select>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Notifications Tab -->
+          <div class="settings-panel" id="notifications">
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-bell"></i> Notification Preferences
+              </h3>
+              <div class="notification-settings">
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4><i class="fa-solid fa-envelope"></i> Email Notifications</h4>
+                    <p>Receive updates and alerts via email</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4><i class="fa-solid fa-bell"></i> Push Notifications</h4>
+                    <p>Get browser push notifications for important updates</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4><i class="fa-solid fa-graduation-cap"></i> Course Updates</h4>
+                    <p>New lessons, assignments, and course announcements</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4><i class="fa-solid fa-bolt"></i> Challenge Reminders</h4>
+                    <p>Reminders for upcoming challenge deadlines</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4><i class="fa-solid fa-trophy"></i> Achievement Notifications</h4>
+                    <p>Celebrate when you earn new certificates and badges</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="notification-item">
+                  <div class="notification-info">
+                    <h4><i class="fa-solid fa-robot"></i> AI Recommendations</h4>
+                    <p>Personalized course and learning path suggestions</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Privacy Tab -->
+          <div class="settings-panel" id="privacy">
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-eye"></i> Profile Visibility
+              </h3>
+              <div class="privacy-settings">
+                <div class="privacy-item">
+                  <div class="privacy-info">
+                    <h4>Show Profile to Public</h4>
+                    <p>Allow others to view your profile and achievements</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="privacy-item">
+                  <div class="privacy-info">
+                    <h4>Show Certificates</h4>
+                    <p>Display your earned certificates on your profile</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" checked />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="privacy-item">
+                  <div class="privacy-info">
+                    <h4>Show Course Progress</h4>
+                    <p>Let others see your learning progress and statistics</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+
+                <div class="privacy-item">
+                  <div class="privacy-info">
+                    <h4>Show Activity Feed</h4>
+                    <p>Share your recent learning activities with others</p>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <h3 class="section-title">
+                <i class="fa-solid fa-database"></i> Data & Privacy
+              </h3>
+              <div class="data-actions">
+                <button class="btn-capsule">
+                  <i class="fa-solid fa-download"></i> Download My Data
+                </button>
+                <button class="btn-capsule" style="border-color: var(--danger); color: var(--danger);">
+                  <i class="fa-solid fa-trash"></i> Delete Account
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Notification Popup -->
+  <div class="notification-popup" id="notification-popup">
+    <div class="popup-header">
+      <h3>Notifications</h3>
+      <div class="popup-actions">
+        <button class="icon-btn-small" id="mark-all-read" title="Mark all as read">
+          <i class="fa-solid fa-check-double"></i>
+        </button>
+        <button class="close-btn" id="close-notifications">&times;</button>
+      </div>
+    </div>
+    <div class="notification-list" id="notification-list">
+      <!-- Notifications will be loaded here -->
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+  <script src="{{ url_for('static', filename='profile.js') }}"></script>
+</body>
+</html>

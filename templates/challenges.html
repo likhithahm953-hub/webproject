@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script>
+    (function() {
+      try {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'light') {
+          document.documentElement.classList.add('light');
+        } else if (theme === 'auto') {
+          const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          if (prefersLight) document.documentElement.classList.add('light');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <title>Challenges — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='challenges.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+  <div class="animated-bg"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <h2><i class="fa-solid fa-hammer"></i> SkillForge</h2>
+      <button id="sidebar-toggle" aria-label="Toggle sidebar" class="toggle-btn">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+    
+    <nav class="nav">
+      <a href="/dashboard" class="nav-item">
+        <i class="fa-solid fa-home"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="/domains" class="nav-item">
+        <i class="fa-solid fa-book"></i>
+        <span>Domains</span>
+      </a>
+      <a href="/challenges" class="nav-item active">
+        <i class="fa-solid fa-bolt"></i>
+        <span>Challenges</span>
+      </a>
+      <a href="/certificates" class="nav-item">
+        <i class="fa-solid fa-trophy"></i>
+        <span>Certificates</span>
+      </a>
+      <a href="/ai-guidance" class="nav-item">
+        <i class="fa-solid fa-robot"></i>
+        <span>AI Guidance</span>
+      </a>
+      <a href="/profile" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <i class="fa-solid fa-gear"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+    
+    <div class="sidebar-footer">
+      <button id="theme-toggle" class="theme-btn" aria-pressed="false" title="Toggle theme">
+        <i class="fa-solid fa-moon"></i>
+        <i class="fa-solid fa-sun"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Container -->
+  <div class="container">
+    <header class="topbar">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">Coding Challenges</h1>
+        <p class="tagline">Test your skills and level up! ⚡</p>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn notification-btn" title="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span class="badge">3</span>
+        </button>
+        <div class="profile-menu">
+          <div class="avatar" id="profile-avatar">
+            {% if user and user.avatar %}
+              <img src="{{ url_for('static', filename='uploads/' ~ user.avatar) }}" alt="avatar" />
+            {% else %}
+              {{ user.username[0]|upper if user else 'U' }}
+            {% endif %}
+          </div>
+          <div class="dropdown-menu" id="profile-dropdown">
+            <a href="/profile"><i class="fa-solid fa-user"></i> Profile</a>
+            <a href="/settings"><i class="fa-solid fa-cog"></i> Settings</a>
+            <a href="/logout"><i class="fa-solid fa-sign-out-alt"></i> Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="dash-main">
+      <!-- Challenge Stats -->
+      <section class="challenge-stats fade-in">
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 146, 60, 0.2)); color: #f59e0b;">
+            <i class="fa-solid fa-fire"></i>
+          </div>
+          <div class="stat-info">
+            <h3>12</h3>
+            <p>Completed</p>
+          </div>
+        </div>
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2)); color: #6366f1;">
+            <i class="fa-solid fa-code"></i>
+          </div>
+          <div class="stat-info">
+            <h3>3</h3>
+            <p>In Progress</p>
+          </div>
+        </div>
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.2)); color: #10b981;">
+            <i class="fa-solid fa-trophy"></i>
+          </div>
+          <div class="stat-info">
+            <h3>850</h3>
+            <p>Points Earned</p>
+          </div>
+        </div>
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.2)); color: #ef4444;">
+            <i class="fa-solid fa-calendar-days"></i>
+          </div>
+          <div class="stat-info">
+            <h3>15</h3>
+            <p>Day Streak</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="challenge-breakdown">
+        <div class="breakdown-card">
+          <h3>Difficulty Mix</h3>
+          <div class="breakdown-bars" id="difficulty-breakdown"></div>
+        </div>
+        <div class="breakdown-card">
+          <h3>Top Topics</h3>
+          <div class="topic-list" id="topic-breakdown"></div>
+        </div>
+        <div class="breakdown-card">
+          <h3>Practice Plan</h3>
+          <p class="breakdown-note">Focus on one easy and one medium challenge per day to build momentum.</p>
+          <button class="challenge-action" id="shuffle-btn">Shuffle Challenges</button>
+        </div>
+      </section>
+
+      <!-- Filter Section -->
+      <div class="filter-section">
+        <div class="filter-tabs">
+          <button class="filter-tab active" data-filter="available">Available</button>
+          <button class="filter-tab" data-filter="active">My Challenges</button>
+          <button class="filter-tab" data-filter="completed">Completed</button>
+        </div>
+        <div class="filter-controls">
+          <button class="difficulty-btn active" data-difficulty="all">All</button>
+          <button class="difficulty-btn easy" data-difficulty="easy">Easy</button>
+          <button class="difficulty-btn medium" data-difficulty="medium">Medium</button>
+          <div class="topic-filter">
+            <label for="topic-filter">Topic</label>
+            <select id="topic-filter" class="topic-select">
+              <option value="all">All Topics</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Challenges Grid -->
+      <section class="challenges-grid" id="challenges-grid">
+        <!-- Challenges will be loaded here -->
+      </section>
+
+      <div class="challenge-modal" id="challenge-modal" aria-hidden="true">
+        <div class="modal-backdrop" data-close="true"></div>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="challenge-modal-title">
+          <button class="modal-close" data-close="true" aria-label="Close challenge details">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+          <div class="modal-header">
+            <span class="modal-difficulty" id="challenge-modal-difficulty"></span>
+            <h2 id="challenge-modal-title">Challenge Title</h2>
+            <div class="modal-tags" id="challenge-modal-tags"></div>
+          </div>
+          <div class="modal-body" id="challenge-modal-body"></div>
+          <div class="modal-footer">
+            <button class="challenge-action" id="challenge-start-btn">Start Challenge</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- AI Chatbot Widget -->
+  {% include 'ai_chatbot.html' %}
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+  <script src="{{ url_for('static', filename='challenges.js') }}"></script>
+</body>
+</html>

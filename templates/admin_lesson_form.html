@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ 'Edit Lesson' if lesson else 'New Lesson' }} — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+  <div class="animated-bg"></div>
+
+  <div class="container" style="margin-left: 0; padding: 32px; max-width: 980px;">
+    <header class="topbar" style="position: static; margin-bottom: 24px;">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">{{ 'Edit Lesson' if lesson else 'Create Lesson' }}</h1>
+        <p class="tagline">{{ course.title }}</p>
+      </div>
+      <div class="top-actions">
+        <a class="btn-capsule" href="/admin/courses/{{ course.id }}/lessons">Back to Lessons</a>
+      </div>
+    </header>
+
+    <section class="dash-main">
+      <form method="post" class="settings-card" style="padding: 24px; display: grid; gap: 16px;">
+        <div>
+          <label class="settings-label">Title</label>
+          <input class="settings-input" name="title" required value="{{ lesson.title if lesson else '' }}">
+        </div>
+        <div>
+          <label class="settings-label">Video URL</label>
+          <input class="settings-input" name="video_url" value="{{ lesson.video_url if lesson else '' }}">
+        </div>
+        <div>
+          <label class="settings-label">Summary</label>
+          <textarea class="settings-input" name="summary" rows="4">{{ lesson.summary if lesson else '' }}</textarea>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px;">
+          <div>
+            <label class="settings-label">Order</label>
+            <input class="settings-input" type="number" name="order_index" value="{{ lesson.order_index if lesson else 1 }}">
+          </div>
+          <div>
+            <label class="settings-label">Duration (minutes)</label>
+            <input class="settings-input" type="number" name="duration_minutes" value="{{ lesson.duration_minutes if lesson else 0 }}">
+          </div>
+          <div>
+            <label class="settings-label">Level</label>
+            <select class="settings-input" name="level">
+              {% for level in ['Zero','Beginner','Intermediate','Advanced'] %}
+              <option value="{{ level }}" {% if lesson and lesson.level == level %}selected{% endif %}>{{ level }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; padding-top: 24px;">
+            <input type="checkbox" name="is_free" {% if lesson and lesson.is_free %}checked{% endif %}>
+            <label class="settings-label" style="margin:0;">Free Preview</label>
+          </div>
+        </div>
+        <div style="display:flex; gap: 10px; justify-content:flex-end;">
+          <button class="btn-capsule primary" type="submit">Save</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</body>
+</html>

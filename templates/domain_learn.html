@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{{ domain.name }} - SkillForge</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --secondary: #8b5cf6;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #334155;
+            --success: #10b981;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background:
+                radial-gradient(circle at 20% 10%, rgba(99, 102, 241, 0.18), transparent 34%),
+                radial-gradient(circle at 85% 20%, rgba(139, 92, 246, 0.16), transparent 30%),
+                var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 40px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .back-btn:hover {
+            background-color: rgba(99, 102, 241, 0.1);
+        }
+
+        .header-title h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header-title p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 24px;
+        }
+
+        .course-display {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.08));
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .main-courses-strip {
+            padding: 22px 24px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0, 0, 0, 0.18);
+        }
+
+        .main-courses-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .main-courses-list {
+            display: flex;
+            gap: 14px;
+            overflow-x: auto;
+            padding-bottom: 6px;
+            scroll-snap-type: x mandatory;
+        }
+
+        .main-course-pill {
+            flex: 0 0 360px;
+            min-height: 96px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            scroll-snap-align: start;
+        }
+
+        .main-course-pill:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.12);
+        }
+
+        .main-course-pill.active {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.2);
+        }
+
+        .main-course-pill-title {
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 1.4;
+            margin-bottom: 6px;
+        }
+
+        .main-course-pill-meta {
+            font-size: 0.86rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .main-course-link {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border);
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            word-break: break-all;
+        }
+
+        .main-course-link a {
+            color: #93c5fd;
+            text-decoration: underline;
+        }
+
+        .course-header {
+            padding: 30px;
+            border-bottom: 1px solid var(--border);
+            background-color: rgba(0, 0, 0, 0.2);
+        }
+
+        .course-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .course-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .course-meta span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .course-price-meta {
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            border: 1.5px solid;
+        }
+
+        .course-price-meta.free {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981 !important;
+            border-color: #10b981;
+        }
+
+        .course-price-meta.paid {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b !important;
+            border-color: #f59e0b;
+        }
+
+        .course-content {
+            padding: 30px;
+            min-height: 420px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: stretch;
+        }
+
+        .iframe-wrapper {
+            width: 100%;
+            height: 600px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        .iframe-wrapper iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .external-link {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 24px;
+            width: 100%;
+            padding: 20px 8px;
+            align-items: start;
+        }
+
+        .external-link-left {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 10px;
+            padding-top: 8px;
+        }
+
+        .external-link-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 14px;
+        }
+
+        .external-link-main {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+        }
+
+        .external-link-icon {
+            font-size: 4rem;
+            color: var(--primary);
+        }
+
+        .external-link-text {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 0;
+            text-align: left;
+            flex: 1;
+        }
+
+        .open-course-btn {
+            padding: 12px 32px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .open-course-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+        }
+
+        .course-url-box {
+            margin-top: 0;
+            width: min(680px, 100%);
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px dashed var(--border);
+            background: rgba(0, 0, 0, 0.22);
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            word-break: break-all;
+            text-align: left;
+        }
+
+        .course-url-box a {
+            color: #93c5fd;
+            text-decoration: underline;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: sticky;
+            top: 16px;
+            align-self: start;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            backdrop-filter: blur(4px);
+        }
+
+        .duration-editor {
+            margin-top: 12px;
+            border-top: 1px solid var(--border);
+            padding-top: 12px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .duration-input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .duration-input-row input {
+            flex: 1;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .duration-save-btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-section {
+            margin-bottom: 20px;
+        }
+
+        .progress-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .course-links-list {
+            list-style: none;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .course-link-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .course-link-item:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-left-color: var(--primary);
+        }
+
+        .course-link-item.active {
+            background: rgba(99, 102, 241, 0.3);
+            border-left-color: var(--primary);
+        }
+
+        .link-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+        }
+
+        .link-source {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .course-price-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 0.7rem;
+            border: 1px solid;
+        }
+
+        .course-price-badge.free {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border-color: #10b981;
+        }
+
+        .course-price-badge.paid {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            border-color: #f59e0b;
+        }
+
+        .quiz-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .quiz-info {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .quiz-btn {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .quiz-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .quiz-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .header-left {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 20px;
+            }
+
+            .header-actions {
+                width: 100%;
+            }
+
+            .header-actions .btn {
+                flex: 1;
+            }
+
+            .iframe-wrapper {
+                height: 400px;
+            }
+
+            .external-link {
+                grid-template-columns: 1fr;
+                gap: 16px;
+                padding: 8px 0;
+            }
+
+            .external-link-left,
+            .external-link-right {
+                align-items: center;
+                text-align: center;
+            }
+
+            .external-link-main {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+
+            .external-link-text {
+                text-align: center;
+            }
+
+            .main-courses-list {
+                display: grid;
+                grid-template-columns: 1fr;
+                overflow-x: visible;
+            }
+
+            .main-course-pill {
+                flex: unset;
+            }
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <button type="button" class="back-btn" onclick="goBackToSite()" style="text-decoration: none; display: inline-flex; align-items: center;">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="header-title">
+                    <h1>{{ domain.name }}</h1>
+                    <p>Structured learning with duration-based quiz unlock</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="/domains" class="btn btn-secondary" style="text-decoration: none;">
+                    <i class="fas fa-book"></i> Browse Domains
+                </a>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Course Display -->
+            <div class="course-display">
+                {% if course_links %}
+                    <div class="main-courses-strip">
+                        <div class="main-courses-title">
+                            <i class="fas fa-list"></i> Available Courses
+                        </div>
+                        <div class="main-courses-list">
+                            {% for link in course_links %}
+                                <div class="main-course-pill {% if selected_course and link.id == selected_course.id %}active{% endif %}" onclick="switchCourse({{ link.id }})">
+                                    <div class="main-course-pill-title">{{ link.title }}</div>
+                                    <div class="main-course-pill-meta">
+                                        {{ link.source }} • {{ ((link.duration_minutes if link.duration_minutes else default_required_minutes) / 60)|round(1) }}h
+                                        {% if link.price %} • {{ link.price }}{% endif %}
+                                    </div>
+                                    {% if selected_course and link.id == selected_course.id %}
+                                        <div class="main-course-link">
+                                            <strong>Course Link:</strong>
+                                            <a href="{{ link.url }}" onclick="event.stopPropagation();">{{ link.url }}</a>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if selected_course %}
+                    <div class="course-header">
+                        <div class="course-title">{{ selected_course.title }}</div>
+                        <div class="course-meta">
+                            <span><i class="fas fa-star"></i> {{ selected_course.rating }}/5</span>
+                            <span><i class="fas fa-globe"></i> {{ selected_course.source }}</span>
+                            <span class="course-price-meta {% if selected_course.price == 'Free' %}free{% else %}paid{% endif %}">
+                                <i class="fas fa-tag"></i> {{ selected_course.price }}
+                            </span>
+                            <span><i class="fas fa-clock"></i> {{ ((selected_course.duration_minutes if selected_course.duration_minutes else default_required_minutes) / 60)|round(1) }}h target</span>
+                        </div>
+                    </div>
+
+                    <div class="course-content">
+                        <div class="external-link">
+                            <div class="external-link-left">
+                                <div class="external-link-icon">
+                                    <i class="fas fa-external-link-alt"></i>
+                                </div>
+                                <strong style="font-size: 1.9rem; line-height: 1;">{{ selected_course.source }}</strong>
+                            </div>
+                            <div class="external-link-right">
+                                <div class="external-link-main">
+                                    <div class="external-link-text">
+                                        This course is hosted externally. Click below to start learning!
+                                    </div>
+                                    <a href="{{ selected_course.url }}" class="open-course-btn">
+                                        <i class="fas fa-play"></i> Open Course
+                                    </a>
+                                </div>
+                                <div class="course-url-box">
+                                    <strong>Course Link:</strong>
+                                    <a href="{{ selected_course.url }}">{{ selected_course.url }}</a>
+                                </div>
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.6;">
+                                    <i class="fas fa-info-circle"></i> 
+                                    <strong>Time Tracking:</strong> After watching videos/learning, manually log your study time using the progress tracker in the sidebar.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="course-content">
+                        <div style="text-align: center;">
+                            {% if course_links %}
+                                <i class="fas fa-hand-pointer" style="font-size: 3rem; color: var(--primary); margin-bottom: 20px;"></i>
+                                <h2>Select a course above</h2>
+                                <p style="color: var(--text-secondary); margin-top: 10px;">
+                                    Click any course in <strong>Available Courses</strong> to display its details and Open Course link.
+                                </p>
+                            {% else %}
+                                <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 20px;"></i>
+                                <h2>No courses available yet</h2>
+                                <p style="color: var(--text-secondary); margin-top: 10px;">
+                                    There are no course links available for this domain at the moment.
+                                </p>
+                                <a href="/domains" class="btn btn-primary" style="margin-top: 20px;">
+                                    <i class="fas fa-arrow-left"></i> Back to Domains
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <!-- Progress Card -->
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fas fa-chart-line"></i> Your Progress
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-value" id="minSpent">0</div>
+                            <div class="stat-label">Minutes</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="progressPct">0%</div>
+                            <div class="stat-label">Complete</div>
+                        </div>
+                    </div>
+                    <div class="progress-section">
+                        <div class="progress-label">
+                            <span>Learning Progress</span>
+                            <span id="progressText">0/{{ default_required_minutes }} min</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                        Complete <span id="requiredDurationLabel">{{ default_required_minutes }} minutes</span> to unlock the quiz
+                    </p>
+                    <div class="duration-editor">
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">Set course duration target (hours)</div>
+                        <div class="duration-input-row">
+                            <input type="number" id="durationHoursInput" min="0.5" step="0.5" value="{{ ((selected_course.duration_minutes if selected_course and selected_course.duration_minutes else default_required_minutes) / 60)|round(1) }}">
+                            <button class="duration-save-btn" onclick="saveDurationTarget()">Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quiz Card -->
+                <div class="card quiz-section">
+                    <div class="card-title">
+                        <i class="fas fa-graduation-cap"></i> Quiz
+                    </div>
+                    <div class="quiz-info">
+                        <strong>How Quiz Unlock Works:</strong><br>
+                        ✅ Complete <span id="quizRequiredLabel">{{ default_required_minutes }} minutes</span> of learning<br>
+                        ✅ Quiz button will automatically unlock<br>
+                        ✅ Take the assessment to earn certificate
+                    </div>
+                    <button class="quiz-btn" id="quizBtn" onclick="startQuiz()" disabled>
+                        <i class="fas fa-lock"></i> Unlock Quiz ({{ enrollment.selected_level }})
+                    </button>
+                </div>
+
+                <!-- Domain Info -->
+                <div class="card">
+                    <div class="card-title">
+                        <i class="fas fa-info-circle"></i> Domain Info
+                    </div>
+                    <p style="font-size: 0.9rem; line-height: 1.6; color: var(--text-secondary);">
+                        {{ domain.description }}
+                    </p>
+                    <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+                        <strong>Level:</strong> {{ enrollment.selected_level }}
+                    </p>
+                    {% if enrollment.assessed_level %}
+                        <p style="font-size: 0.8rem; color: var(--success); margin-top: 8px;">
+                            <i class="fas fa-check-circle"></i> <strong>Assessed Level:</strong> {{ enrollment.assessed_level }}
+                        </p>
+                    {% endif %}
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        const domainId = {{ domain.id }};
+        const selectedCourseId = {{ selected_course.id if selected_course else 0 }};
+        const defaultRequiredMinutes = {{ default_required_minutes }};
+
+        let requiredMinutes = defaultRequiredMinutes;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!selectedCourseId) {
+                const quizBtn = document.getElementById('quizBtn');
+                if (quizBtn) {
+                    quizBtn.disabled = true;
+                    quizBtn.innerHTML = '<i class="fas fa-lock"></i> Select a course first';
+                }
+                return;
+            }
+            loadProgress();
+            setInterval(loadProgress, 30000);
+        });
+
+        function goBackToSite() {
+            if (window.history.length > 1) {
+                window.history.back();
+                return;
+            }
+            window.location.href = '/dashboard';
+        }
+
+        function formatDurationLabel(minutes) {
+            if (minutes % 60 === 0) {
+                const hours = Math.floor(minutes / 60);
+                return hours === 1 ? '1 hour' : `${hours} hours`;
+            }
+            return `${minutes} minutes`;
+        }
+
+        function updateRequirementLabels() {
+            const label = formatDurationLabel(requiredMinutes);
+            document.getElementById('requiredDurationLabel').textContent = label;
+            document.getElementById('quizRequiredLabel').textContent = label;
+            const hoursInput = document.getElementById('durationHoursInput');
+            if (hoursInput && document.activeElement !== hoursInput) {
+                hoursInput.value = (requiredMinutes / 60).toFixed(1).replace(/\.0$/, '');
+            }
+        }
+
+        function loadProgress() {
+            if (!selectedCourseId) {
+                return;
+            }
+            fetch(`/api/domain/${domainId}/course/${selectedCourseId}/progress`)
+                .then((r) => {
+                    if (!r.ok) throw new Error('Failed to load progress');
+                    return r.json();
+                })
+                .then((data) => {
+                    requiredMinutes = Math.max(1, Number(data.required_minutes || defaultRequiredMinutes));
+                    updateRequirementLabels();
+                    const minutes = Number(data.tutorial_minutes || 0);
+                    const progressPercent = Math.min(Math.round((minutes / requiredMinutes) * 100), 100);
+                    updateProgressUI(minutes, progressPercent);
+                })
+                .catch(() => {});
+        }
+
+        function updateProgressUI(minutes, progressPercent) {
+            document.getElementById('minSpent').textContent = minutes;
+            document.getElementById('progressPct').textContent = `${progressPercent}%`;
+            document.getElementById('progressText').textContent = `${minutes}/${requiredMinutes} min`;
+
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = `${progressPercent}%`;
+            progressFill.style.background = progressPercent >= 100
+                ? 'linear-gradient(90deg, #10b981, #059669)'
+                : 'linear-gradient(90deg, #8b5cf6, #6366f1)';
+
+            const quizBtn = document.getElementById('quizBtn');
+            if (minutes >= requiredMinutes) {
+                quizBtn.disabled = false;
+                quizBtn.innerHTML = '<i class="fas fa-check-circle"></i> Start Quiz Now';
+                quizBtn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            } else {
+                const remaining = requiredMinutes - minutes;
+                quizBtn.disabled = true;
+                quizBtn.innerHTML = `<i class="fas fa-lock"></i> ${remaining} min remaining`;
+            }
+        }
+
+        function logProgress(minutes) {
+            if (!selectedCourseId) {
+                return Promise.reject(new Error('Please select a course first.'));
+            }
+            const safeMinutes = Math.max(1, Number(minutes || 0));
+            return fetch(`/api/domain/${domainId}/course/${selectedCourseId}/progress`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    minutes: safeMinutes,
+                    mark_complete: safeMinutes >= requiredMinutes
+                })
+            })
+            .then(async (r) => {
+                const payload = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(payload.error || 'Failed to save progress');
+                return payload;
+            })
+            .then((data) => {
+                requiredMinutes = Math.max(1, Number(data.required_minutes || requiredMinutes));
+                updateRequirementLabels();
+                loadProgress();
+            });
+        }
+
+        function saveDurationTarget() {
+            if (!selectedCourseId) {
+                alert('Please select a course first.');
+                return;
+            }
+            const hoursInput = document.getElementById('durationHoursInput');
+            const hours = Number(hoursInput.value);
+            if (!hours || hours <= 0) {
+                alert('Enter a valid duration in hours.');
+                return;
+            }
+
+            fetch(`/api/domain/${domainId}/course/${selectedCourseId}/duration`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ duration_hours: hours })
+            })
+            .then(async (r) => {
+                const payload = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(payload.error || 'Failed to save duration');
+                return payload;
+            })
+            .then((data) => {
+                requiredMinutes = Math.max(1, Number(data.duration_minutes || requiredMinutes));
+                updateRequirementLabels();
+                showToast(`Updated target to ${formatDurationLabel(requiredMinutes)}.`);
+                loadProgress();
+            })
+            .catch((err) => alert(err.message));
+        }
+
+        function startQuiz() {
+            if (!selectedCourseId) {
+                alert('Please select a course first.');
+                return;
+            }
+            window.location.href = `/domain/${domainId}/course/${selectedCourseId}/quiz`;
+        }
+
+        function switchCourse(courseId) {
+            window.location.href = `/domain/${domainId}/learn?course=${courseId}`;
+        }
+
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #10b981, #059669);
+                color: white;
+                padding: 12px 18px;
+                border-radius: 10px;
+                box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+                z-index: 10000;
+                font-weight: 600;
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+    </script>
+</body>
+</html>

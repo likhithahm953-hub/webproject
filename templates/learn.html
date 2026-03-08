@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script>
+    (function() {
+      try {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'light') {
+          document.documentElement.classList.add('light');
+        } else if (theme === 'auto') {
+          const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          if (prefersLight) document.documentElement.classList.add('light');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <title>{{ course.title }} — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .learn-container {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      gap: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    
+    .lessons-sidebar {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      max-height: calc(100vh - 150px);
+      overflow-y: auto;
+    }
+    
+    .lessons-sidebar h3 {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      opacity: 0.7;
+    }
+    
+    .lesson-item {
+      padding: 12px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+      font-size: 14px;
+    }
+    
+    .lesson-item:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .lesson-item.active {
+      background: rgba(59, 130, 246, 0.2);
+      border-left-color: #3b82f6;
+      color: #3b82f6;
+      font-weight: 500;
+    }
+    
+    .lesson-item.completed {
+      opacity: 0.6;
+    }
+    
+    .lesson-item.completed::before {
+      content: '✓';
+      margin-right: 8px;
+      color: #10b981;
+    }
+    
+    .lesson-content {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 32px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .lesson-header {
+      margin-bottom: 32px;
+    }
+    
+    .lesson-header h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    
+    .lesson-header p {
+      opacity: 0.7;
+      font-size: 14px;
+    }
+    
+    .video-player {
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 8px;
+      margin-bottom: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      opacity: 0.5;
+    }
+    
+    .lesson-summary {
+      margin-bottom: 32px;
+    }
+    
+    .lesson-summary h2 {
+      font-size: 20px;
+      margin-bottom: 16px;
+    }
+    
+    .lesson-summary p {
+      line-height: 1.8;
+      opacity: 0.8;
+    }
+    
+    .lesson-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 32px;
+      padding-top: 32px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .btn-capsule {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+    
+    .btn-capsule:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .btn-capsule.primary {
+      background: #3b82f6;
+      color: #fff;
+    }
+    
+    .btn-capsule.primary:hover {
+      background: #2563eb;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 64px 32px;
+    }
+    
+    .empty-state i {
+      font-size: 64px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    
+    .empty-state h3 {
+      margin-bottom: 8px;
+    }
+    
+    @media (max-width: 768px) {
+      .learn-container {
+        grid-template-columns: 1fr;
+      }
+      
+      .lessons-sidebar {
+        max-height: 300px;
+      }
+    }
+  </style>
+</head>
+<body class="dashboard-page">
+  <div class="animated-bg"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <h2><i class="fa-solid fa-hammer"></i> SkillForge</h2>
+      <button id="sidebar-toggle" aria-label="Toggle sidebar" class="toggle-btn">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+    
+    <nav class="nav">
+      <a href="/dashboard" class="nav-item">
+        <i class="fa-solid fa-home"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="/domains" class="nav-item active">
+        <i class="fa-solid fa-book"></i>
+        <span>Domains</span>
+      </a>
+      <a href="/challenges" class="nav-item">
+        <i class="fa-solid fa-bolt"></i>
+        <span>Challenges</span>
+      </a>
+      <a href="/certificates" class="nav-item">
+        <i class="fa-solid fa-trophy"></i>
+        <span>Certificates</span>
+      </a>
+      <a href="/ai-guidance" class="nav-item">
+        <i class="fa-solid fa-robot"></i>
+        <span>AI Guidance</span>
+      </a>
+      <a href="/profile" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <i class="fa-solid fa-gear"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+    
+    <div class="sidebar-footer">
+      <button id="theme-toggle" class="theme-btn" aria-pressed="false" title="Toggle theme">
+        <i class="fa-solid fa-moon"></i>
+        <i class="fa-solid fa-sun"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Container -->
+  <div class="container">
+    <header class="topbar">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">{{ course.title }}</h1>
+        <p class="tagline">{{ course.description }}</p>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn notification-btn" title="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span class="badge">3</span>
+        </button>
+        <div class="profile-menu">
+          <div class="avatar" id="profile-avatar">
+            {% if user and user.avatar %}
+              <img src="{{ url_for('static', filename='uploads/' ~ user.avatar) }}" alt="avatar" />
+            {% else %}
+              {{ user.username[0]|upper if user else 'U' }}
+            {% endif %}
+          </div>
+          <div class="dropdown-menu" id="profile-dropdown">
+            <a href="/profile"><i class="fa-solid fa-user"></i> Profile</a>
+            <a href="/settings"><i class="fa-solid fa-cog"></i> Settings</a>
+            <a href="/logout"><i class="fa-solid fa-sign-out-alt"></i> Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="dash-main">
+      {% if lessons %}
+      <div class="learn-container">
+        <!-- Lessons Sidebar -->
+        <aside class="lessons-sidebar">
+          <h3>Lessons</h3>
+          <div id="lessons-list">
+            {% for lesson in lessons %}
+            <div class="lesson-item {% if loop.first %}active{% endif %}" data-lesson-id="{{ lesson.id }}">
+              <span class="lesson-number">{{ lesson.order_index }}.</span>
+              <span class="lesson-title">{{ lesson.title }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </aside>
+
+        <!-- Lesson Content -->
+        <div class="lesson-content">
+          <div class="lesson-header">
+            <h1 id="current-lesson-title">{{ lessons[0].title }}</h1>
+            <p id="current-lesson-meta">Duration: {{ lessons[0].duration_minutes }} minutes • Level: {{ lessons[0].level }}</p>
+          </div>
+
+          <div class="video-player" id="video-player">
+            <i class="fa-solid fa-play"></i> Video will play here
+          </div>
+
+          <div class="lesson-summary">
+            <h2>Summary</h2>
+            <p id="current-lesson-summary">{{ lessons[0].summary or 'No summary available for this lesson.' }}</p>
+          </div>
+
+          <div class="lesson-actions">
+            <button class="btn-capsule" id="prev-lesson-btn" style="display: none;">
+              <i class="fa-solid fa-chevron-left"></i> Previous
+            </button>
+            <button class="btn-capsule primary" id="next-lesson-btn" {% if lessons|length == 1 %}style="display: none;"{% endif %}>
+              Next <i class="fa-solid fa-chevron-right"></i>
+            </button>
+            {% if lessons|length == 1 %}
+            <button class="btn-capsule primary" id="complete-course-btn">
+              Mark Complete
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const lessonsData = {{ lessons|tojson }};
+        let currentLessonIndex = 0;
+
+        function loadLesson(index) {
+          if (index < 0 || index >= lessonsData.length) return;
+          
+          currentLessonIndex = index;
+          const lesson = lessonsData[index];
+          
+          // Update content
+          document.getElementById('current-lesson-title').textContent = lesson.title;
+          document.getElementById('current-lesson-meta').textContent = `Duration: ${lesson.duration_minutes} minutes • Level: ${lesson.level}`;
+          document.getElementById('current-lesson-summary').textContent = lesson.summary || 'No summary available for this lesson.';
+          
+          // Update active state in sidebar
+          document.querySelectorAll('.lesson-item').forEach((item, i) => {
+            item.classList.toggle('active', i === index);
+          });
+          
+          // Update button states
+          document.getElementById('prev-lesson-btn').style.display = index > 0 ? 'block' : 'none';
+          document.getElementById('next-lesson-btn').style.display = index < lessonsData.length - 1 ? 'block' : 'none';
+        }
+
+        // Event listeners
+        document.querySelectorAll('.lesson-item').forEach((item, index) => {
+          item.addEventListener('click', () => loadLesson(index));
+        });
+
+        document.getElementById('prev-lesson-btn')?.addEventListener('click', () => {
+          loadLesson(currentLessonIndex - 1);
+        });
+
+        document.getElementById('next-lesson-btn')?.addEventListener('click', () => {
+          loadLesson(currentLessonIndex + 1);
+        });
+
+        document.getElementById('complete-course-btn')?.addEventListener('click', () => {
+          alert('Course marked as complete!');
+          window.location.href = '/courses';
+        });
+      </script>
+      {% else %}
+      <div class="empty-state">
+        <i class="fa-solid fa-book-open"></i>
+        <h3>No lessons yet</h3>
+        <p>This course doesn't have lessons yet. Check back soon!</p>
+        <a href="/courses" style="margin-top: 16px; display: inline-block; color: #3b82f6;">Back to Courses</a>
+      </div>
+      {% endif %}
+    </main>
+  </div>
+
+  <!-- AI Chatbot Widget -->
+  {% include 'ai_chatbot.html' %}
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ 'Edit Course' if course else 'New Course' }} — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+  <div class="animated-bg"></div>
+
+  <div class="container" style="margin-left: 0; padding: 32px; max-width: 980px;">
+    <header class="topbar" style="position: static; margin-bottom: 24px;">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">{{ 'Edit Course' if course else 'Create Course' }}</h1>
+        <p class="tagline">Fill in the course details</p>
+      </div>
+      <div class="top-actions">
+        <a class="btn-capsule" href="/admin/courses">Back to Courses</a>
+      </div>
+    </header>
+
+    <section class="dash-main">
+      <form method="post" class="settings-card" style="padding: 24px; display: grid; gap: 16px;">
+        <div>
+          <label class="settings-label">Title</label>
+          <input class="settings-input" name="title" required value="{{ course.title if course else '' }}">
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+          <div>
+            <label class="settings-label">Category</label>
+            <input class="settings-input" name="category" required value="{{ course.category if course else '' }}">
+          </div>
+          <div>
+            <label class="settings-label">Instructor</label>
+            <input class="settings-input" name="instructor" required value="{{ course.instructor if course else '' }}">
+          </div>
+        </div>
+        <div>
+          <label class="settings-label">Description</label>
+          <textarea class="settings-input" name="description" rows="4" required>{{ course.description if course else '' }}</textarea>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px;">
+          <div>
+            <label class="settings-label">Level</label>
+            <select class="settings-input" name="level">
+              {% for level in ['Zero','Beginner','Intermediate','Advanced'] %}
+              <option value="{{ level }}" {% if course and course.level == level %}selected{% endif %}>{{ level }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="settings-label">Duration</label>
+            <input class="settings-input" name="duration" placeholder="8 weeks" value="{{ course.duration if course else '' }}">
+          </div>
+          <div>
+            <label class="settings-label">Lessons</label>
+            <input class="settings-input" type="number" name="lessons" value="{{ course.lessons if course else 0 }}">
+          </div>
+          <div>
+            <label class="settings-label">Students</label>
+            <input class="settings-input" type="number" name="students" value="{{ course.students if course else 0 }}">
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px;">
+          <div>
+            <label class="settings-label">Rating</label>
+            <input class="settings-input" type="number" step="0.1" name="rating" value="{{ course.rating if course else 0 }}">
+          </div>
+          <div>
+            <label class="settings-label">Reviews</label>
+            <input class="settings-input" type="number" name="reviews" value="{{ course.reviews if course else 0 }}">
+          </div>
+          <div>
+            <label class="settings-label">Thumbnail Emoji</label>
+            <input class="settings-input" name="thumbnail" value="{{ course.thumbnail if course else '📚' }}">
+          </div>
+          <div>
+            <label class="settings-label">Status</label>
+            <select class="settings-input" name="status">
+              {% for status in ['bookmarked','in-progress','completed'] %}
+              <option value="{{ status }}" {% if course and course.status == status %}selected{% endif %}>{{ status }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap: 10px; justify-content:flex-end;">
+          <button class="btn-capsule primary" type="submit">Save</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</body>
+</html>

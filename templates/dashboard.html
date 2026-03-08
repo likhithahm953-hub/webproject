@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script>
+    (function() {
+      try {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'light') {
+          document.documentElement.classList.add('light');
+        } else if (theme === 'auto') {
+          const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          if (prefersLight) document.documentElement.classList.add('light');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <title>Dashboard — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="{{ url_for('static', filename='dashboard.js') }}" defer></script>
+</head>
+<body class="dashboard-page">
+  <!-- Animated Background -->
+  <div class="animated-bg"></div>
+
+  <!-- Interactive Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <h2><i class="fa-solid fa-hammer"></i> SkillForge</h2>
+      <button id="sidebar-toggle" aria-label="Toggle sidebar" class="toggle-btn">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+    
+    <nav class="nav">
+      <a href="#" class="nav-item active" data-section="dashboard">
+        <i class="fa-solid fa-chart-line"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="/domains" class="nav-item">
+        <i class="fa-solid fa-book"></i>
+        <span>Domains</span>
+      </a>
+      <a href="/challenges" class="nav-item">
+        <i class="fa-solid fa-bolt"></i>
+        <span>Challenges</span>
+      </a>
+      <a href="/certificates" class="nav-item">
+        <i class="fa-solid fa-trophy"></i>
+        <span>Certificates</span>
+      </a>
+      <a href="/ai-guidance" class="nav-item">
+        <i class="fa-solid fa-robot"></i>
+        <span>AI Guidance</span>
+      </a>
+      <a href="/profile" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <i class="fa-solid fa-gear"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+    
+    <div class="sidebar-footer">
+      <button id="theme-toggle" class="theme-btn" aria-pressed="false" title="Toggle theme">
+        <i class="fa-solid fa-moon"></i>
+        <i class="fa-solid fa-sun"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Container -->
+  <div class="container">
+    <!-- Top Navigation Bar -->
+    <header class="topbar">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">Welcome back, <strong>{{ user.username if user else 'User' }}</strong></h1>
+        <p class="tagline">Ready to forge new skills today?</p>
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn notification-btn" title="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span class="badge">3</span>
+        </button>
+        <div class="profile-menu">
+          <div class="avatar" id="profile-avatar">
+            {% if user and user.avatar %}
+              <img src="{{ url_for('static', filename='uploads/' ~ user.avatar) }}" alt="avatar" />
+            {% else %}
+              {{ user.username[0]|upper if user else 'U' }}
+            {% endif %}
+          </div>
+          <div class="dropdown-menu" id="profile-dropdown">
+            <a href="/profile"><i class="fa-solid fa-user"></i> Profile</a>
+            <a href="/settings"><i class="fa-solid fa-cog"></i> Settings</a>
+            <a href="/logout"><i class="fa-solid fa-sign-out-alt"></i> Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="dash-main">
+      <!-- Progress Overview Cards -->
+      <section class="overview-section fade-in">
+        <div class="overview-cards">
+          <div class="stat-card hover-glow" data-aos="fade-up" data-aos-delay="0" data-stat="domains">
+            <div class="card-icon courses">
+              <i class="fa-solid fa-graduation-cap"></i>
+            </div>
+            <div class="card-content">
+              <h3 id="courses-enrolled">0</h3>
+              <p>Domains Enrolled</p>
+              <div class="card-footer">
+                <span class="trend up"><i class="fa-solid fa-arrow-up"></i> 0 this month</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card hover-glow" data-aos="fade-up" data-aos-delay="100" data-stat="challenges">
+            <div class="card-icon challenges">
+              <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div class="card-content">
+              <h3 id="challenges-completed">0</h3>
+              <p>Challenges Completed</p>
+              <div class="card-footer">
+                <div class="mini-progress">
+                  <div class="mini-progress-bar" style="width: 0%"></div>
+                </div>
+                <span class="trend">0% completion</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card hover-glow" data-aos="fade-up" data-aos-delay="200" data-stat="certificates">
+            <div class="card-icon certificates">
+              <i class="fa-solid fa-certificate"></i>
+            </div>
+            <div class="card-content">
+              <h3 id="certs-earned">0</h3>
+              <p>Certificates Earned</p>
+              <div class="card-footer">
+                <span class="trend neutral"><i class="fa-solid fa-star"></i> Keep going!</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card hover-glow" data-aos="fade-up" data-aos-delay="300" data-stat="recommendations">
+            <div class="card-icon ai">
+              <i class="fa-solid fa-robot"></i>
+            </div>
+            <div class="card-content">
+              <h3 id="ai-recs">0</h3>
+              <p>AI Recommendations</p>
+              <div class="card-footer">
+                <span class="trend new"><i class="fa-solid fa-sparkles"></i> New for you</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Main Content Area with Tabs -->
+      <section class="content-section fade-in">
+        <div class="tabs-container">
+          <div class="tabs">
+            <button class="tab active" data-tab="current">
+              <i class="fa-solid fa-play-circle"></i> Current Domains
+            </button>
+            <button class="tab" data-tab="upcoming">
+              <i class="fa-solid fa-clock"></i> Upcoming Challenges
+            </button>
+            <button class="tab" data-tab="recommended">
+              <i class="fa-solid fa-lightbulb"></i> Recommended Paths
+            </button>
+          </div>
+        </div>
+
+        <div class="tab-panels">
+          <!-- Current Courses Tab -->
+          <div class="panel active" id="current">
+            <div class="content-grid" id="courses-grid">
+              <!-- Courses inserted by JS -->
+            </div>
+          </div>
+
+          <!-- Upcoming Challenges Tab -->
+          <div class="panel" id="upcoming">
+            <div class="content-grid" id="challenges-grid">
+              <!-- Challenges inserted by JS -->
+            </div>
+          </div>
+
+          <!-- Recommended Paths Tab -->
+          <div class="panel" id="recommended">
+            <div class="content-grid" id="recs-grid">
+              <!-- Recommendations inserted by JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Activity Feed Section -->
+      <section class="activity-section fade-in">
+        <div class="section-header">
+          <h2><i class="fa-solid fa-chart-line"></i> Recent Activity</h2>
+          <a href="#" class="view-all">View All <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+        <div class="activity-feed" id="activity-feed">
+          <!-- Activity items inserted by JS -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Notification Popup -->
+  <div class="notification-popup" id="notification-popup">
+    <div class="popup-header">
+      <h3>Notifications</h3>
+      <button class="close-btn" id="close-notifications">&times;</button>
+    </div>
+    <div class="notification-list">
+      <div class="notification-item unread">
+        <i class="fa-solid fa-trophy"></i>
+        <div class="notification-content">
+          <p>You earned a certificate!</p>
+          <span class="time">2 hours ago</span>
+        </div>
+      </div>
+      <div class="notification-item unread">
+        <i class="fa-solid fa-bolt"></i>
+        <div class="notification-content">
+          <p>New challenge available: Array Algorithms</p>
+          <span class="time">5 hours ago</span>
+        </div>
+      </div>
+      <div class="notification-item">
+        <i class="fa-solid fa-robot"></i>
+        <div class="notification-content">
+          <p>AI has 3 new recommendations for you</p>
+          <span class="time">1 day ago</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

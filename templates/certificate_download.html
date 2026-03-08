@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certificate - {{ cert.certificate_code }}</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #f5f7fb;
+      color: #1f2937;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .certificate {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      border: 10px solid #d4a017;
+      border-radius: 12px;
+      padding: 40px 36px;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.12);
+    }
+
+    .title {
+      text-align: center;
+      font-size: 38px;
+      letter-spacing: 1px;
+      margin: 8px 0;
+      color: #7a4c00;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      text-align: center;
+      margin: 0 0 24px;
+      color: #7a4c00;
+      font-size: 16px;
+    }
+
+    .recipient-label {
+      text-align: center;
+      font-size: 18px;
+      margin-top: 16px;
+    }
+
+    .recipient {
+      text-align: center;
+      font-size: 34px;
+      margin: 8px 0 16px;
+      font-weight: bold;
+      color: #0f172a;
+      word-break: break-word;
+    }
+
+    .course-line {
+      text-align: center;
+      font-size: 20px;
+      margin: 0 0 20px;
+      color: #111827;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin: 24px 0;
+    }
+
+    .meta-item {
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fafafa;
+    }
+
+    .meta-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+
+    .meta-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+      word-break: break-word;
+    }
+
+    .verify {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 2px solid #e5e7eb;
+      font-family: Arial, sans-serif;
+    }
+
+    .verify-title {
+      font-size: 14px;
+      color: #374151;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+
+    .verify-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      word-break: break-all;
+      font-size: 14px;
+    }
+
+    .verify-link:hover {
+      text-decoration: underline;
+    }
+
+    .app-link {
+      display: inline-block;
+      margin-top: 12px;
+      background: #1d4ed8;
+      color: #fff;
+      text-decoration: none;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .app-link:hover {
+      background: #1e40af;
+    }
+
+    @media (max-width: 700px) {
+      .certificate {
+        padding: 28px 20px;
+      }
+
+      .meta {
+        grid-template-columns: 1fr;
+      }
+
+      .title {
+        font-size: 30px;
+      }
+
+      .recipient {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="certificate">
+    <h1 class="title">Certificate</h1>
+    <p class="subtitle">Certificate of Completion</p>
+
+    <p class="recipient-label">This certifies that</p>
+    <p class="recipient">{{ user_name }}</p>
+    <p class="course-line">has successfully completed {{ cert.domain }} - {{ cert.course_title }}</p>
+
+    <section class="meta">
+      <article class="meta-item">
+        <div class="meta-label">Certificate Code</div>
+        <div class="meta-value">{{ cert.certificate_code }}</div>
+      </article>
+      <article class="meta-item">
+        <div class="meta-label">Issued On</div>
+        <div class="meta-value">{{ cert.date }}</div>
+      </article>
+      <article class="meta-item">
+        <div class="meta-label">Score</div>
+        <div class="meta-value">{{ cert.score }}%</div>
+      </article>
+      <article class="meta-item">
+        <div class="meta-label">Grade</div>
+        <div class="meta-value">{{ cert.grade }}</div>
+      </article>
+      <article class="meta-item">
+        <div class="meta-label">Issuer</div>
+        <div class="meta-value">{{ cert.issuer }}</div>
+      </article>
+      <article class="meta-item">
+        <div class="meta-label">Certificate Title</div>
+        <div class="meta-value">{{ cert.title }}</div>
+      </article>
+    </section>
+
+    <section class="verify">
+      <div class="verify-title">Verify this certificate ownership</div>
+      <a class="verify-link" href="{{ verification_url }}" target="_blank" rel="noopener noreferrer">{{ verification_url }}</a>
+      <div>
+        <a class="app-link" href="{{ app_url }}" target="_blank" rel="noopener noreferrer">Open In SkillForge App</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

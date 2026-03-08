@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin Courses — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+  <div class="animated-bg"></div>
+
+  <div class="container" style="margin-left: 0; padding: 32px;">
+    <header class="topbar" style="position: static; margin-bottom: 24px;">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">Admin Courses</h1>
+        <p class="tagline">Create and manage course catalog</p>
+      </div>
+      <div class="top-actions">
+        <a class="btn-capsule primary" href="/admin/courses/new">
+          <i class="fa-solid fa-plus"></i> New Course
+        </a>
+        <a class="btn-capsule" href="/dashboard">Back to Dashboard</a>
+      </div>
+    </header>
+
+    <section class="dash-main">
+      <div class="settings-card" style="padding: 16px;">
+        <div style="overflow:auto;">
+          <table style="width:100%; border-collapse: collapse;">
+            <thead>
+              <tr style="text-align:left; color: var(--text-secondary); font-size: 0.9rem;">
+                <th style="padding: 10px;">Title</th>
+                <th style="padding: 10px;">Category</th>
+                <th style="padding: 10px;">Level</th>
+                <th style="padding: 10px;">Lessons</th>
+                <th style="padding: 10px;">Status</th>
+                <th style="padding: 10px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for course in courses %}
+              <tr style="border-top: 1px solid var(--border-color);">
+                <td style="padding: 10px;">{{ course.title }}</td>
+                <td style="padding: 10px;">{{ course.category }}</td>
+                <td style="padding: 10px;">{{ course.level }}</td>
+                <td style="padding: 10px;">{{ course.lessons }}</td>
+                <td style="padding: 10px;">{{ course.status }}</td>
+                <td style="padding: 10px; display:flex; gap:8px; flex-wrap:wrap;">
+                  <a class="btn-capsule" href="/admin/courses/{{ course.id }}/edit">Edit</a>
+                  <a class="btn-capsule" href="/admin/courses/{{ course.id }}/lessons">Lessons</a>
+                  <form method="post" action="/admin/courses/{{ course.id }}/delete" onsubmit="return confirm('Delete this course?');">
+                    <button class="btn-capsule" type="submit">Delete</button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="6" style="padding: 16px; color: var(--text-secondary);">No courses yet.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

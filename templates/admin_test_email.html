@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SMTP Test</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="form-page">
+    <div class="form-container">
+        <h2>Send Test Email</h2>
+        <p>Use this page to validate your SMTP configuration. Enter an email address to receive a test message.</p>
+        <form method="POST" id="test-email-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="email" name="to_email" id="to_email" placeholder="Recipient email" value="{{ default_to }}" required>
+            <button type="submit" class="btn">Send Test Email</button>
+            {% if test_message %}
+            <div id="test-result" class="register-result {{ test_status }}" role="status" aria-live="polite">{{ test_message }}</div>
+            {% endif %}
+        </form>
+        <p><a href="/">Back to Home</a></p>
+    </div>
+</body>
+</html>

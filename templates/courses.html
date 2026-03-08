@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script>
+    (function() {
+      try {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'light') {
+          document.documentElement.classList.add('light');
+        } else if (theme === 'auto') {
+          const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          if (prefersLight) document.documentElement.classList.add('light');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <title>My Courses — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='courses.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+  <div class="animated-bg"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <h2><i class="fa-solid fa-hammer"></i> SkillForge</h2>
+      <button id="sidebar-toggle" aria-label="Toggle sidebar" class="toggle-btn">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+    
+    <nav class="nav">
+      <a href="/dashboard" class="nav-item">
+        <i class="fa-solid fa-home"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="/domains" class="nav-item active">
+        <i class="fa-solid fa-book"></i>
+        <span>Domains</span>
+      </a>
+      <a href="/challenges" class="nav-item">
+        <i class="fa-solid fa-bolt"></i>
+        <span>Challenges</span>
+      </a>
+      <a href="/certificates" class="nav-item">
+        <i class="fa-solid fa-trophy"></i>
+        <span>Certificates</span>
+      </a>
+      <a href="/ai-guidance" class="nav-item">
+        <i class="fa-solid fa-robot"></i>
+        <span>AI Guidance</span>
+      </a>
+      <a href="/profile" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <i class="fa-solid fa-gear"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+    
+    <div class="sidebar-footer">
+      <button id="theme-toggle" class="theme-btn" aria-pressed="false" title="Toggle theme">
+        <i class="fa-solid fa-moon"></i>
+        <i class="fa-solid fa-sun"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Container -->
+  <div class="container">
+    <header class="topbar">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">My Courses</h1>
+        <p class="tagline">Continue your learning journey</p>
+      </div>
+      <div class="top-actions">
+        <button class="btn-capsule primary" id="browse-courses-btn">
+          <i class="fa-solid fa-compass"></i> Browse Courses
+        </button>
+        <button class="icon-btn notification-btn" title="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span class="badge">3</span>
+        </button>
+        <div class="profile-menu">
+          <div class="avatar" id="profile-avatar">
+            {% if user and user.avatar %}
+              <img src="{{ url_for('static', filename='uploads/' ~ user.avatar) }}" alt="avatar" />
+            {% else %}
+              {{ user.username[0]|upper if user else 'U' }}
+            {% endif %}
+          </div>
+          <div class="dropdown-menu" id="profile-dropdown">
+            <a href="/profile"><i class="fa-solid fa-user"></i> Profile</a>
+            <a href="/settings"><i class="fa-solid fa-cog"></i> Settings</a>
+            <a href="/logout"><i class="fa-solid fa-sign-out-alt"></i> Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="dash-main">
+      <!-- Course Stats -->
+      <section class="course-stats fade-in">
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.2)); color: #3b82f6;">
+            <i class="fa-solid fa-book-open"></i>
+          </div>
+          <div class="stat-info">
+            <h3>3</h3>
+            <p>In Progress</p>
+          </div>
+        </div>
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.2)); color: #10b981;">
+            <i class="fa-solid fa-check-circle"></i>
+          </div>
+          <div class="stat-info">
+            <h3>8</h3>
+            <p>Completed</p>
+          </div>
+        </div>
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 146, 60, 0.2)); color: #f59e0b;">
+            <i class="fa-solid fa-clock"></i>
+          </div>
+          <div class="stat-info">
+            <h3>156h</h3>
+            <p>Total Hours</p>
+          </div>
+        </div>
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.2)); color: #8b5cf6;">
+            <i class="fa-solid fa-star"></i>
+          </div>
+          <div class="stat-info">
+            <h3>4.8</h3>
+            <p>Avg Rating</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Filter Tabs -->
+      <div class="filter-section">
+        <div class="filter-tabs-row">
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all">All Courses</button>
+            <button class="filter-tab" data-filter="in-progress">In Progress</button>
+            <button class="filter-tab" data-filter="completed">Completed</button>
+            <button class="filter-tab" data-filter="bookmarked">Bookmarked</button>
+          </div>
+          <select class="filter-select inline">
+            <option>Sort by: Recent</option>
+            <option>Sort by: Progress</option>
+            <option>Sort by: Name</option>
+            <option>Sort by: Rating</option>
+          </select>
+        </div>
+        <div class="filter-controls">
+          <div class="search-box">
+            <i class="fa-solid fa-search"></i>
+            <input type="text" placeholder="Search courses..." id="course-search" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Courses Grid -->
+      <section class="courses-grid" id="courses-grid">
+        <!-- Courses will be loaded here -->
+      </section>
+    </main>
+  </div>
+
+  <!-- Enroll & Domain Assessment Modal -->
+  <div class="enroll-modal" id="enroll-modal" aria-hidden="true">
+    <div class="enroll-modal-content">
+      <button class="enroll-close" id="enroll-close" aria-label="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <div class="enroll-header">
+        <h3 id="enroll-course-title">Enroll for Free</h3>
+        <p id="enroll-course-subtitle">Pick a domain, take a short assessment, and get a personalized path.</p>
+      </div>
+
+      <div class="enroll-step" id="enroll-step-domain">
+        <h4>Choose your domain</h4>
+        <p class="step-hint">Select the field you want to master so the AI can tailor your path.</p>
+        <div class="domain-options" id="domain-options"></div>
+        <div class="enroll-actions">
+          <button class="btn-capsule primary" id="domain-next-btn" disabled>Next: Skill Assessment</button>
+        </div>
+      </div>
+
+      <div class="enroll-step" id="enroll-step-assessment" hidden>
+        <h4>Skill level assessment</h4>
+        <p class="step-hint">Answer a few quick questions to determine your level and gaps.</p>
+        <div class="assessment-questions" id="assessment-questions"></div>
+        <div class="enroll-actions">
+          <button class="btn-capsule" id="assessment-back-btn">Back</button>
+          <button class="btn-capsule primary" id="assessment-submit-btn" disabled>Generate Path</button>
+        </div>
+      </div>
+
+      <div class="enroll-step" id="enroll-step-result" hidden>
+        <h4>Your personalized career path</h4>
+        <div class="recommendation-box" id="recommendation-box">
+          <div class="result-summary">
+            <span class="result-pill" id="assessment-level"></span>
+            <span class="result-pill subtle" id="assessment-domain"></span>
+          </div>
+          <div class="result-section">
+            <h5>Struggling concepts</h5>
+            <ul id="assessment-gaps"></ul>
+          </div>
+          <div class="result-section">
+            <h5>Your personalized path</h5>
+            <ol id="path-list"></ol>
+          </div>
+          <div class="result-section">
+            <h5>Real-world gig challenges</h5>
+            <div class="gig-list" id="gig-list"></div>
+          </div>
+        </div>
+        <div class="enroll-actions">
+          <button class="btn-capsule" id="restart-quiz-btn">Restart</button>
+          <button class="btn-capsule primary" id="start-course-btn">Start Learning</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Chatbot Widget -->
+  {% include 'ai_chatbot.html' %}
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+  <script src="{{ url_for('static', filename='courses.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sign Up</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="form-page">
+    <div class="form-container">
+        <h2>Create Your Account</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flashes">
+            {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        <p class="quote">"Every expert was once a beginner — start your journey today!"</p>
+        <form method="POST" id="signup-form" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="input-group">
+                <span class="input-icon">👤</span>
+                <input type="text" name="username" id="username" placeholder="Enter Username" required>
+            </div>
+            <div class="input-group">
+                <span class="input-icon">✉️</span>
+                <input type="email" name="email" id="email" placeholder="Enter Email" required>
+            </div>
+            <div id="email-hint" class="hint"></div>
+
+            <div class="pw-row">
+                <input type="password" name="password" id="password" placeholder="Enter Password" required>
+                <button type="button" class="toggle-password" data-target="password" aria-pressed="false" aria-label="Show password"></button>
+            </div>
+            <div class="pw-row">
+                <input type="password" name="confirm_password" id="confirm_password" placeholder="Confirm Password" required>
+                <button type="button" class="toggle-password" data-target="confirm_password" aria-pressed="false" aria-label="Show password"></button>
+            </div>
+            <!-- Inline confirm-specific errors (placed directly under confirm input) -->
+            <div id="confirm-inline-errors" class="error" aria-live="polite"></div>
+
+            <div id="password-strength">
+                <div class="strength-bar"></div>
+                <div class="strength-text"></div>
+            </div>
+
+            <!-- Inline password-specific errors (placed directly under password inputs) -->
+            <div id="pw-inline-errors" class="error" aria-live="polite"></div>
+
+            <div id="pw-rules" class="pw-rules" aria-live="polite">
+                <div class="pw-header"><strong>Your password needs to:</strong></div>
+                <ul class="pw-list">
+                    <li class="rule invalid" id="rule-length"><span class="rule-icon">✖</span> include at least 8 characters</li>
+                    <li class="rule invalid" id="rule-upper"><span class="rule-icon">✖</span> include an uppercase letter</li>
+                    <li class="rule invalid" id="rule-lower"><span class="rule-icon">✖</span> include a lowercase letter</li>
+                    <li class="rule invalid" id="rule-digit"><span class="rule-icon">✖</span> include a digit</li>
+                    <li class="rule invalid" id="rule-symbol"><span class="rule-icon">✖</span> include a symbol (e.g., !@#$%)</li>
+                </ul>
+            </div>
+
+            <div id="inline-errors" class="error"></div>
+            <button type="submit" class="btn" id="register-btn">Register</button>
+            {% if register_message %}
+            <div id="register-result" class="register-result {{ register_status }}" role="status" aria-live="polite">{{ register_message }}</div>
+            {% endif %}
+        </form>
+        <p>Already have an account? <a href="/login">Login here</a></p>
+    </div>
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</body>
+</html>

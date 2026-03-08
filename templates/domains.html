@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <script>
+    (function() {
+      try {
+        const theme = localStorage.getItem('theme') || 'dark';
+        if (theme === 'light') {
+          document.documentElement.classList.add('light');
+        } else if (theme === 'auto') {
+          const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+          if (prefersLight) document.documentElement.classList.add('light');
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <title>My Domains — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='courses.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='domains.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+  <div class="animated-bg"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <h2><i class="fa-solid fa-hammer"></i> SkillForge</h2>
+      <button id="sidebar-toggle" aria-label="Toggle sidebar" class="toggle-btn">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+    
+    <nav class="nav">
+      <a href="/dashboard" class="nav-item">
+        <i class="fa-solid fa-home"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="/domains" class="nav-item active">
+        <i class="fa-solid fa-book"></i>
+        <span>Domains</span>
+      </a>
+      <a href="/challenges" class="nav-item">
+        <i class="fa-solid fa-bolt"></i>
+        <span>Challenges</span>
+      </a>
+      <a href="/certificates" class="nav-item">
+        <i class="fa-solid fa-trophy"></i>
+        <span>Certificates</span>
+      </a>
+      <a href="/ai-guidance" class="nav-item">
+        <i class="fa-solid fa-robot"></i>
+        <span>AI Guidance</span>
+      </a>
+      <a href="/profile" class="nav-item">
+        <i class="fa-solid fa-user"></i>
+        <span>Profile</span>
+      </a>
+      <a href="/settings" class="nav-item">
+        <i class="fa-solid fa-gear"></i>
+        <span>Settings</span>
+      </a>
+    </nav>
+    
+    <div class="sidebar-footer">
+      <button id="theme-toggle" class="theme-btn" aria-pressed="false" title="Toggle theme">
+        <i class="fa-solid fa-moon"></i>
+        <i class="fa-solid fa-sun"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Container -->
+  <div class="container">
+    <header class="topbar">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">My Domains</h1>
+        <p class="tagline">Explore <strong id="total-domains-count">100</strong> high-demand technology domains</p>
+      </div>
+      <div class="top-actions">
+        <button class="btn-capsule primary" id="browse-domains-btn">
+          <i class="fa-solid fa-compass"></i> Browse Domains
+        </button>
+        <button class="icon-btn notification-btn" title="Notifications">
+          <i class="fa-solid fa-bell"></i>
+          <span class="badge">3</span>
+        </button>
+        <div class="profile-menu">
+          <div class="avatar" id="profile-avatar">
+            {% if user and user.avatar %}
+              <img src="{{ url_for('static', filename='uploads/' ~ user.avatar) }}" alt="avatar" />
+            {% else %}
+              {{ user.username[0]|upper if user else 'U' }}
+            {% endif %}
+          </div>
+          <div class="dropdown-menu" id="profile-dropdown">
+            <a href="/profile"><i class="fa-solid fa-user"></i> Profile</a>
+            <a href="/settings"><i class="fa-solid fa-cog"></i> Settings</a>
+            <a href="/logout"><i class="fa-solid fa-sign-out-alt"></i> Logout</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="dash-main">
+      <!-- Domain Stats -->
+      <section class="course-stats fade-in">
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.2)); color: #3b82f6;">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div class="stat-info">
+            <h3 id="domains-count">100</h3>
+            <p>Domains</p>
+          </div>
+        </div>
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.2)); color: #10b981;">
+            <i class="fa-solid fa-check-circle"></i>
+          </div>
+          <div class="stat-info">
+            <h3>4</h3>
+            <p>Completed</p>
+          </div>
+        </div>
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 146, 60, 0.2)); color: #f59e0b;">
+            <i class="fa-solid fa-clock"></i>
+          </div>
+          <div class="stat-info">
+            <h3>2</h3>
+            <p>In Progress</p>
+          </div>
+        </div>
+        <div class="stat-card-small">
+          <div class="stat-icon" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(168, 85, 247, 0.2)); color: #8b5cf6;">
+            <i class="fa-solid fa-star"></i>
+          </div>
+          <div class="stat-info">
+            <h3>4.9</h3>
+            <p>Avg Rating</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Filter Tabs -->
+      <div class="filter-section">
+        <div class="filter-tabs-row">
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-filter="all">All Domains</button>
+            <button class="filter-tab" data-filter="in-progress">In Progress</button>
+            <button class="filter-tab" data-filter="completed">Completed</button>
+            <button class="filter-tab" data-filter="bookmarked">Bookmarked</button>
+          </div>
+          <select class="filter-select inline">
+            <option>Sort by: Recent</option>
+            <option>Sort by: Progress</option>
+            <option>Sort by: Name</option>
+            <option>Sort by: Rating</option>
+          </select>
+        </div>
+        <div class="filter-controls">
+          <div class="search-box">
+            <i class="fa-solid fa-search"></i>
+            <input type="text" placeholder="Search domains..." id="domain-search" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Domains Grid -->
+      <section class="courses-grid domains-grid" id="domains-grid">
+        <!-- Domains will be loaded here -->
+      </section>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="empty-state" style="display: none;">
+        <i class="fa-solid fa-inbox"></i>
+        <h3>No domains found</h3>
+        <p>Try adjusting your search</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Level Selection Modal -->
+  <div class="modal" id="level-modal" aria-hidden="true">
+    <div class="modal-content">
+      <button class="modal-close" id="level-close" aria-label="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <div class="modal-header">
+        <h3 id="modal-domain-name">Select Your Level</h3>
+        <p>Choose your current skill level to get a personalized assessment</p>
+      </div>
+
+      <div class="modal-body">
+        <div class="level-cards" id="level-cards">
+          <div class="level-card" data-level="Zero">
+            <div class="level-icon">🌱</div>
+            <h4>Zero Level</h4>
+            <p>Completely new to this domain</p>
+          </div>
+          <div class="level-card" data-level="Beginner">
+            <div class="level-icon">📚</div>
+            <h4>Beginner</h4>
+            <p>Some basic knowledge</p>
+          </div>
+          <div class="level-card" data-level="Intermediate">
+            <div class="level-icon">⚙️</div>
+            <h4>Intermediate</h4>
+            <p>Comfortable with concepts</p>
+          </div>
+          <div class="level-card" data-level="Advanced">
+            <div class="level-icon">🚀</div>
+            <h4>Advanced</h4>
+            <p>Expert level knowledge</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-capsule" id="level-cancel">Cancel</button>
+        <button class="btn-capsule primary" id="level-confirm" disabled>Continue to Assessment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assessment Modal -->
+  <div class="modal" id="assessment-modal" aria-hidden="true">
+    <div class="modal-content large">
+      <button class="modal-close" id="assessment-close" aria-label="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <div class="modal-header">
+        <h3>Skill Level Assessment</h3>
+        <p>Answer these questions to get your personalized learning path</p>
+      </div>
+
+      <div class="modal-body">
+        <div id="assessment-container"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-capsule" id="assessment-back">Back</button>
+        <button class="btn-capsule primary" id="assessment-submit" disabled>Get My Learning Path</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results Modal with Top Courses -->
+  <div class="modal" id="results-modal" aria-hidden="true">
+    <div class="modal-content large">
+      <button class="modal-close" id="results-close" aria-label="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <div class="modal-header">
+        <h3>Your Personalized Learning Path</h3>
+        <p>Here are the top 10 courses curated for you (Free & Paid options)</p>
+      </div>
+
+      <div class="modal-body">
+        <div class="assessment-result" id="assessment-result"></div>
+        <div class="top-courses" id="top-courses"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-capsule" id="results-restart">Choose Different Domain</button>
+        <button class="btn-capsule primary" id="results-start">Start Learning</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Chatbot Widget -->
+  {% include 'ai_chatbot.html' %}
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+  <script src="{{ url_for('static', filename='domains.js') }}"></script>
+</body>
+</html>

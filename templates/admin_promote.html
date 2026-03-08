@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Promote Admin — SkillForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dashboard-page">
+  <div class="animated-bg"></div>
+
+  <div class="container" style="margin-left: 0; padding: 32px; max-width: 720px;">
+    <header class="topbar" style="position: static; margin-bottom: 24px;">
+      <div class="hero-welcome">
+        <h1 class="welcome-text">Promote Admin</h1>
+        <p class="tagline">{{ 'Only existing admins can promote users.' if has_admin else 'No admin exists yet — you can set the first admin.' }}</p>
+      </div>
+      <div class="top-actions">
+        <a class="btn-capsule" href="/dashboard">Back to Dashboard</a>
+      </div>
+    </header>
+
+    <section class="dash-main">
+      <form method="post" class="settings-card" style="padding: 24px; display: grid; gap: 16px;">
+        <div>
+          <label class="settings-label">Username to promote</label>
+          <input class="settings-input" name="username" placeholder="e.g. admin" required>
+        </div>
+        <div style="display:flex; gap: 10px; justify-content:flex-end;">
+          <button class="btn-capsule primary" type="submit">Promote</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</body>
+</html>

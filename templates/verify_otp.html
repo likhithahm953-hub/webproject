@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Verify Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="form-page">
+    <div class="form-container">
+        <h2>Two-Step Verification</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flashes">
+            {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        <p class="quote">Enter the 6-digit code sent to your email.</p>
+        <form method="POST" id="otp-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="text" name="otp_code" id="otp_code" placeholder="Enter verification code" inputmode="numeric" pattern="\d{6}" maxlength="6" required>
+            <button type="submit" class="btn">Verify & Continue</button>
+        </form>
+        <p>Back to <a href="/login">Login</a></p>
+    </div>
+</body>
+</html>

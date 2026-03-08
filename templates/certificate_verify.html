@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certificate Verification</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    .card {
+      max-width: 760px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 28px;
+    }
+
+    .status {
+      border-radius: 8px;
+      padding: 12px;
+      margin: 14px 0 20px;
+      font-weight: 600;
+    }
+
+    .status.valid {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+
+    .status.invalid {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .row:last-child {
+      border-bottom: none;
+    }
+
+    .label {
+      color: #6b7280;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .value {
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    @media (max-width: 640px) {
+      .row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Certificate Verification</h1>
+
+    <div class="status {{ 'valid' if is_valid else 'invalid' }}">{{ message }}</div>
+
+    <section>
+      <div class="row">
+        <div class="label">Checked Code</div>
+        <div class="value">{{ checked_code or 'Not provided' }}</div>
+      </div>
+      <div class="row">
+        <div class="label">Checked User</div>
+        <div class="value">{{ checked_user or 'Not provided' }}</div>
+      </div>
+    </section>
+
+    {% if cert %}
+    <section style="margin-top: 20px;">
+      <div class="row">
+        <div class="label">Owner</div>
+        <div class="value">{{ cert.username }}</div>
+      </div>
+      <div class="row">
+        <div class="label">Domain</div>
+        <div class="value">{{ cert.domain }}</div>
+      </div>
+      <div class="row">
+        <div class="label">Course</div>
+        <div class="value">{{ cert.course_title }}</div>
+      </div>
+      <div class="row">
+        <div class="label">Certificate Title</div>
+        <div class="value">{{ cert.title }}</div>
+      </div>
+      <div class="row">
+        <div class="label">Issued On</div>
+        <div class="value">{{ cert.issued_at.strftime('%B %d, %Y') }}</div>
+      </div>
+      <div class="row">
+        <div class="label">Issuer</div>
+        <div class="value">{{ cert.issuer }}</div>
+      </div>
+      <div class="row">
+        <div class="label">Score / Grade</div>
+        <div class="value">{{ cert.score }}% / {{ cert.grade }}</div>
+      </div>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>
