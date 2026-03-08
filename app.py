@@ -879,6 +879,11 @@ def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None)
     password = app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS')
     from_addr = app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or user
     allow_insecure_raw = app.config.get('SMTP_ALLOW_INSECURE') or os.environ.get('SMTP_ALLOW_INSECURE') or 'false'
+
+    # Gmail app passwords are often copied with spaces (xxxx xxxx xxxx xxxx).
+    # Normalize them to avoid authentication failures in hosted envs.
+    if password and host and 'gmail' in str(host).lower():
+        password = str(password).replace(' ', '')
     if isinstance(allow_insecure_raw, bool):
         allow_insecure = allow_insecure_raw
     else:
@@ -1227,13 +1232,13 @@ The SkillForge Team
                 elif 'timed out' in err_l:
                     register_message = 'Email server timed out. Please try again in a moment.'
                 else:
-                    register_message = 'We could not send a confirmation email. Please try again.'
+                    register_message = f'We could not send a confirmation email. Error: {error_msg}'
                 register_status = 'error'
                 db.session.delete(pending)
                 db.session.commit()
         except Exception as exc:
             app.logger.error(f'Error sending/scheduling registration email for {email}: {exc}')
-            register_message = 'We encountered an error sending a confirmation email. Please try again.'
+            register_message = f'We encountered an error sending a confirmation email. Error: {exc}'
             register_status = 'error'
             db.session.delete(pending)
             db.session.commit()
