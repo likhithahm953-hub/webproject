@@ -4127,11 +4127,11 @@ def login():
 
         require_email_verification = bool(app.config.get('REQUIRE_EMAIL_VERIFICATION', True))
 
-        # find user by username (case-insensitive) or email (normalized lowercase)
+        # Find user by username/email (both case-insensitive).
         user = User.query.filter(
             or_(
                 func.lower(User.username) == normalized_identifier,
-                User.email == normalized_identifier
+                func.lower(User.email) == normalized_identifier
             )
         ).first()
 
@@ -4140,7 +4140,7 @@ def login():
             pending_account = PendingRegistration.query.filter(
                 or_(
                     func.lower(PendingRegistration.username) == normalized_identifier,
-                    PendingRegistration.email == normalized_identifier
+                    func.lower(PendingRegistration.email) == normalized_identifier
                 )
             ).first()
 
@@ -4158,11 +4158,15 @@ def login():
             db.session.commit()
             pending_account = None
 
-        if user is None or not check_password_hash(user.password_hash, password):
+        if user is None:
             if pending_account:
                 flash('Your account is pending email verification. Please verify from your email, then log in.', 'warning')
                 return redirect(url_for('login'))
-            flash('Invalid credentials.', 'error')
+            flash('Account not found. Please sign up first.', 'error')
+            return redirect(url_for('login'))
+
+        if not check_password_hash(user.password_hash, password):
+            flash('Incorrect password. Please try again.', 'error')
             return redirect(url_for('login'))
 
         # Check if email is verified
