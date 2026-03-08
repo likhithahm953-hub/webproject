@@ -4125,6 +4125,8 @@ def login():
             flash('Please provide both identifier and password.', 'error')
             return redirect(url_for('login'))
 
+        require_email_verification = bool(app.config.get('REQUIRE_EMAIL_VERIFICATION', True))
+
         # find user by username (case-insensitive) or email (normalized lowercase)
         user = User.query.filter(
             or_(
@@ -4141,6 +4143,20 @@ def login():
                     PendingRegistration.email == normalized_identifier
                 )
             ).first()
+
+        if (not require_email_verification) and (not user) and pending_account and check_password_hash(pending_account.password_hash, password):
+            # Auto-promote legacy pending registrations when email verification is disabled.
+            user = User(
+                username=pending_account.username,
+                email=pending_account.email,
+                password_hash=pending_account.password_hash,
+                created_at=datetime.datetime.utcnow(),
+                email_verified=True
+            )
+            db.session.add(user)
+            db.session.delete(pending_account)
+            db.session.commit()
+            pending_account = None
 
         if user is None or not check_password_hash(user.password_hash, password):
             if pending_account:
