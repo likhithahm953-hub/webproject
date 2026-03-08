@@ -12,10 +12,6 @@ services:
         value: 3.11.9
       - key: FLASK_SECRET_KEY
         generateValue: true
-      - key: DATABASE_PATH
-        value: /var/data/database.db
-      - key: DATA_DIR
-        value: /var/data
       - key: LAUNCH_PIPELINE_TIMEOUT_SECONDS
         value: 5
       - key: TEST_ALERT_INTERVAL_MINUTES
@@ -38,7 +34,3 @@ services:
         value: "false"
       - key: GEMINI_API_KEY
         sync: false
-    disks:
-      - name: skillforge-data
-        mountPath: /var/data
-        sizeGB: 1
