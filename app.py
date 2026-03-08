@@ -1015,20 +1015,17 @@ def signup():
             flash('Email already registered.', 'error')
             return redirect(url_for('signup'))
 
-        require_email_verification = bool(app.config.get('REQUIRE_EMAIL_VERIFICATION', True))
+        pending_username = PendingRegistration.query.filter_by(username=username).first()
+        if pending_username:
+            if not _purge_pending_if_expired(pending_username):
+                flash('Username is pending verification. Please check your email or try again in 3 minutes.', 'error')
+                return redirect(url_for('signup'))
 
-        if require_email_verification:
-            pending_username = PendingRegistration.query.filter_by(username=username).first()
-            if pending_username:
-                if not _purge_pending_if_expired(pending_username):
-                    flash('Username is pending verification. Please check your email or try again in 3 minutes.', 'error')
-                    return redirect(url_for('signup'))
-
-            pending_email = PendingRegistration.query.filter_by(email=email).first()
-            if pending_email:
-                if not _purge_pending_if_expired(pending_email):
-                    flash('Email is pending verification. Please check your email or try again in 3 minutes.', 'error')
-                    return redirect(url_for('signup'))
+        pending_email = PendingRegistration.query.filter_by(email=email).first()
+        if pending_email:
+            if not _purge_pending_if_expired(pending_email):
+                flash('Email is pending verification. Please check your email or try again in 3 minutes.', 'error')
+                return redirect(url_for('signup'))
 
         if password != confirm:
             flash('Passwords do not match.', 'error')
@@ -1038,20 +1035,6 @@ def signup():
         if not ok:
             flash('Password does not meet rules: ' + '; '.join(errors), 'error')
             return redirect(url_for('signup'))
-
-        if not require_email_verification:
-            user = User(
-                username=username,
-                email=email,
-                password_hash=generate_password_hash(password),
-                created_at=datetime.datetime.utcnow(),
-                email_verified=True
-            )
-            db.session.add(user)
-            db.session.commit()
-            session.pop('csrf_token', None)
-            flash('Registration successful. You can log in now.', 'success')
-            return redirect(url_for('login'))
 
         # create pending registration and send verification email
         verification_token = secrets.token_urlsafe(32)
@@ -4125,8 +4108,6 @@ def login():
             flash('Please provide both identifier and password.', 'error')
             return redirect(url_for('login'))
 
-        require_email_verification = bool(app.config.get('REQUIRE_EMAIL_VERIFICATION', True))
-
         # Find user by username/email (both case-insensitive).
         user = User.query.filter(
             or_(
@@ -4144,20 +4125,6 @@ def login():
                 )
             ).first()
 
-        if (not require_email_verification) and (not user) and pending_account and check_password_hash(pending_account.password_hash, password):
-            # Auto-promote legacy pending registrations when email verification is disabled.
-            user = User(
-                username=pending_account.username,
-                email=pending_account.email,
-                password_hash=pending_account.password_hash,
-                created_at=datetime.datetime.utcnow(),
-                email_verified=True
-            )
-            db.session.add(user)
-            db.session.delete(pending_account)
-            db.session.commit()
-            pending_account = None
-
         if user is None:
             if pending_account:
                 flash('Your account is pending email verification. Please verify from your email, then log in.', 'warning')
@@ -4170,7 +4137,7 @@ def login():
             return redirect(url_for('login'))
 
         # Check if email is verified
-        if app.config.get('REQUIRE_EMAIL_VERIFICATION', True) and not user.email_verified:
+        if not user.email_verified:
             flash('Please verify your email first. Check your inbox for the verification link.', 'warning')
             return redirect(url_for('login'))
 
