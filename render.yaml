@@ -20,6 +20,8 @@ services:
         value: 300
       - key: QUIZ_PASS_THRESHOLD
         value: 70
+      - key: REQUIRE_EMAIL_VERIFICATION
+        value: "false"
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT

@@ -39,6 +39,10 @@ app.config.setdefault('LAUNCH_PIPELINE_TIMEOUT_SECONDS', int(os.environ.get('LAU
 app.config.setdefault('TEST_ALERT_INTERVAL_MINUTES', int(os.environ.get('TEST_ALERT_INTERVAL_MINUTES', '300')))
 app.config.setdefault('COURSE_COMPLETION_MINUTES', int(os.environ.get('COURSE_COMPLETION_MINUTES', '300')))
 app.config.setdefault('QUIZ_PASS_THRESHOLD', int(os.environ.get('QUIZ_PASS_THRESHOLD', '70')))
+app.config.setdefault(
+    'REQUIRE_EMAIL_VERIFICATION',
+    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'true')).lower() in ('1', 'true', 'yes')
+)
 
 # Log SMTP configuration on startup (for debugging)
 @app.before_request
@@ -1011,17 +1015,20 @@ def signup():
             flash('Email already registered.', 'error')
             return redirect(url_for('signup'))
 
-        pending_username = PendingRegistration.query.filter_by(username=username).first()
-        if pending_username:
-            if not _purge_pending_if_expired(pending_username):
-                flash('Username is pending verification. Please check your email or try again in 3 minutes.', 'error')
-                return redirect(url_for('signup'))
+        require_email_verification = bool(app.config.get('REQUIRE_EMAIL_VERIFICATION', True))
 
-        pending_email = PendingRegistration.query.filter_by(email=email).first()
-        if pending_email:
-            if not _purge_pending_if_expired(pending_email):
-                flash('Email is pending verification. Please check your email or try again in 3 minutes.', 'error')
-                return redirect(url_for('signup'))
+        if require_email_verification:
+            pending_username = PendingRegistration.query.filter_by(username=username).first()
+            if pending_username:
+                if not _purge_pending_if_expired(pending_username):
+                    flash('Username is pending verification. Please check your email or try again in 3 minutes.', 'error')
+                    return redirect(url_for('signup'))
+
+            pending_email = PendingRegistration.query.filter_by(email=email).first()
+            if pending_email:
+                if not _purge_pending_if_expired(pending_email):
+                    flash('Email is pending verification. Please check your email or try again in 3 minutes.', 'error')
+                    return redirect(url_for('signup'))
 
         if password != confirm:
             flash('Passwords do not match.', 'error')
@@ -1031,6 +1038,20 @@ def signup():
         if not ok:
             flash('Password does not meet rules: ' + '; '.join(errors), 'error')
             return redirect(url_for('signup'))
+
+        if not require_email_verification:
+            user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password),
+                created_at=datetime.datetime.utcnow(),
+                email_verified=True
+            )
+            db.session.add(user)
+            db.session.commit()
+            session.pop('csrf_token', None)
+            flash('Registration successful. You can log in now.', 'success')
+            return redirect(url_for('login'))
 
         # create pending registration and send verification email
         verification_token = secrets.token_urlsafe(32)
@@ -4129,7 +4150,7 @@ def login():
             return redirect(url_for('login'))
 
         # Check if email is verified
-        if not user.email_verified:
+        if app.config.get('REQUIRE_EMAIL_VERIFICATION', True) and not user.email_verified:
             flash('Please verify your email first. Check your inbox for the verification link.', 'warning')
             return redirect(url_for('login'))
 
