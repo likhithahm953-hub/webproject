@@ -1242,7 +1242,8 @@ The SkillForge Team
         session.pop('csrf_token', None)
         if register_message:
             flash(register_message, register_status or 'success')
-        flash('IMPORTANT: Please click the verification link in your email within 3 minutes to complete registration.', 'warning')
+        if register_status == 'success':
+            flash('IMPORTANT: Please click the verification link in your email within 3 minutes to complete registration.', 'warning')
         return redirect(url_for('login'))
 
     # GET: set CSRF
