@@ -50,8 +50,6 @@ app.config.setdefault(
     'REQUIRE_EMAIL_VERIFICATION',
     str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'true')).lower() in ('1', 'true', 'yes')
 )
-# Emergency fallback: keep onboarding available even when SMTP is broken in production.
-app.config['REQUIRE_EMAIL_VERIFICATION'] = False
 
 # Log SMTP configuration on startup (for debugging)
 @app.before_request
