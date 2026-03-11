@@ -17,6 +17,7 @@ import threading
 import datetime
 import json
 import time
+from urllib.parse import urlparse
 import urllib.request
 import urllib.error
 try:
@@ -39,6 +40,12 @@ app.config.setdefault('LAUNCH_PIPELINE_TIMEOUT_SECONDS', int(os.environ.get('LAU
 app.config.setdefault('TEST_ALERT_INTERVAL_MINUTES', int(os.environ.get('TEST_ALERT_INTERVAL_MINUTES', '300')))
 app.config.setdefault('COURSE_COMPLETION_MINUTES', int(os.environ.get('COURSE_COMPLETION_MINUTES', '300')))
 app.config.setdefault('QUIZ_PASS_THRESHOLD', int(os.environ.get('QUIZ_PASS_THRESHOLD', '70')))
+app.config.setdefault('SMTP_HOST', os.environ.get('SMTP_HOST', ''))
+app.config.setdefault('SMTP_PORT', os.environ.get('SMTP_PORT', ''))
+app.config.setdefault('SMTP_USER', os.environ.get('SMTP_USER', ''))
+app.config.setdefault('SMTP_PASS', os.environ.get('SMTP_PASS', ''))
+app.config.setdefault('EMAIL_FROM', os.environ.get('EMAIL_FROM', ''))
+app.config.setdefault('SMTP_ALLOW_INSECURE', os.environ.get('SMTP_ALLOW_INSECURE', 'false'))
 app.config.setdefault(
     'REQUIRE_EMAIL_VERIFICATION',
     str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'true')).lower() in ('1', 'true', 'yes')
@@ -49,14 +56,29 @@ app.config.setdefault(
 def log_smtp_config():
     ensure_test_alert_dispatcher_started()
     if not hasattr(app, '_smtp_logged'):
-        smtp_host = app.config.get('SMTP_HOST')
-        smtp_user = app.config.get('SMTP_USER')
-        smtp_port = app.config.get('SMTP_PORT')
-        email_from = app.config.get('EMAIL_FROM')
+        smtp_host = (app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST') or '').strip()
+        smtp_user = (app.config.get('SMTP_USER') or os.environ.get('SMTP_USER') or '').strip()
+        smtp_port = (str(app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '')).strip()
+        email_from = (app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or '').strip()
+        smtp_pass = (app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS') or '').strip()
         if all([smtp_host, smtp_user, smtp_port, email_from]):
             app.logger.info(f'SMTP configured: host={smtp_host}, user={smtp_user}, port={smtp_port}, from={email_from}')
         else:
-            app.logger.warning(f'SMTP not fully configured - missing fields')
+            missing = []
+            if not smtp_host:
+                missing.append('SMTP_HOST')
+            if not smtp_user:
+                missing.append('SMTP_USER')
+            if not smtp_port:
+                missing.append('SMTP_PORT')
+            if not email_from:
+                missing.append('EMAIL_FROM')
+            app.logger.warning(f'SMTP not fully configured - missing fields: {", ".join(missing)}')
+
+        # If email verification is enabled but SMTP cannot actually send, fall back to direct signup.
+        if app.config.get('REQUIRE_EMAIL_VERIFICATION') and not all([smtp_host, smtp_user, smtp_port, email_from, smtp_pass]):
+            app.config['REQUIRE_EMAIL_VERIFICATION'] = False
+            app.logger.warning('REQUIRE_EMAIL_VERIFICATION auto-disabled because SMTP is incomplete.')
         app._smtp_logged = True
 
 # Simple in-memory user store (for demo only)
@@ -874,11 +896,34 @@ def _send_email(to_addr, subject, body):
 def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None):
     """Sends email synchronously. Returns (success, error_message)."""
     host = app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST')
-    port = int(app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '587')
+    port_raw = app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '587'
     user = app.config.get('SMTP_USER') or os.environ.get('SMTP_USER')
     password = app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS')
     from_addr = app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or user
     allow_insecure_raw = app.config.get('SMTP_ALLOW_INSECURE') or os.environ.get('SMTP_ALLOW_INSECURE') or 'false'
+
+    # Normalize config values so accidental spaces/newlines from env vars don't break SMTP.
+    host = str(host).strip() if host is not None else ''
+    user = str(user).strip() if user is not None else ''
+    password = str(password).strip() if password is not None else ''
+    from_addr = str(from_addr).strip() if from_addr is not None else ''
+
+    # Accept common misconfigurations like "https://smtp.gmail.com" or "smtp.gmail.com:587".
+    if host and '://' in host:
+        parsed = urlparse(host)
+        host = (parsed.hostname or '').strip()
+    elif host and ':' in host and host.count(':') == 1:
+        maybe_host, maybe_port = host.rsplit(':', 1)
+        if maybe_port.isdigit():
+            host = maybe_host.strip()
+            if not (app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT')):
+                port_raw = maybe_port
+
+    try:
+        port = int(str(port_raw).strip())
+    except Exception:
+        app.logger.warning(f'Invalid SMTP_PORT value: {port_raw!r}; falling back to 587')
+        port = 587
 
     # Gmail app passwords are often copied with spaces (xxxx xxxx xxxx xxxx).
     # Normalize them to avoid authentication failures in hosted envs.
@@ -1040,6 +1085,26 @@ def signup():
         if not ok:
             flash('Password does not meet rules: ' + '; '.join(errors), 'error')
             return redirect(url_for('signup'))
+
+        # Fallback mode: allow normal signup when email verification is disabled.
+        if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
+            user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password),
+                email_verified=True
+            )
+            db.session.add(user)
+            db.session.commit()
+
+            session.pop('csrf_token', None)
+            session['user'] = user.username
+            session['username'] = user.username
+            session['email'] = user.email
+            session['user_id'] = user.id
+
+            flash('Signup successful. Email verification is currently disabled.', 'success')
+            return redirect(url_for('dashboard'))
 
         # create pending registration and send verification email
         verification_token = secrets.token_urlsafe(32)
@@ -1229,19 +1294,17 @@ The SkillForge Team
                     register_message = 'Verification email service is not configured yet. Please contact admin.'
                 elif 'authentication' in err_l or 'username and password not accepted' in err_l:
                     register_message = 'Email server rejected login credentials. Please contact admin to fix SMTP settings.'
+                elif 'name or service not known' in err_l or 'nodename nor servname provided' in err_l or 'getaddrinfo failed' in err_l:
+                    register_message = 'SMTP host is invalid or unreachable. Please contact admin to check SMTP_HOST.'
                 elif 'timed out' in err_l:
                     register_message = 'Email server timed out. Please try again in a moment.'
                 else:
                     register_message = f'We could not send a confirmation email. Error: {error_msg}'
                 register_status = 'error'
-                db.session.delete(pending)
-                db.session.commit()
         except Exception as exc:
             app.logger.error(f'Error sending/scheduling registration email for {email}: {exc}')
             register_message = f'We encountered an error sending a confirmation email. Error: {exc}'
             register_status = 'error'
-            db.session.delete(pending)
-            db.session.commit()
 
         # Don't auto-login - user must verify email first
         session.pop('csrf_token', None)
@@ -4131,6 +4194,29 @@ def login():
                 )
             ).first()
 
+        # In fallback mode, auto-activate pending accounts so users are not blocked.
+        if user is None and pending_account and not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
+            if not check_password_hash(pending_account.password_hash, password):
+                flash('Incorrect password. Please try again.', 'error')
+                return redirect(url_for('login'))
+
+            user = User.query.filter(
+                or_(
+                    func.lower(User.username) == normalized_identifier,
+                    func.lower(User.email) == normalized_identifier
+                )
+            ).first()
+            if user is None:
+                user = User(
+                    username=pending_account.username,
+                    email=pending_account.email,
+                    password_hash=pending_account.password_hash,
+                    email_verified=True
+                )
+                db.session.add(user)
+                db.session.delete(pending_account)
+                db.session.commit()
+
         if user is None:
             if pending_account:
                 flash('Your account is pending email verification. Please verify from your email, then log in.', 'warning')
@@ -4143,7 +4229,7 @@ def login():
             return redirect(url_for('login'))
 
         # Check if email is verified
-        if not user.email_verified:
+        if app.config.get('REQUIRE_EMAIL_VERIFICATION', True) and not user.email_verified:
             flash('Please verify your email first. Check your inbox for the verification link.', 'warning')
             return redirect(url_for('login'))
 
