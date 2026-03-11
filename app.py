@@ -75,10 +75,9 @@ def log_smtp_config():
                 missing.append('EMAIL_FROM')
             app.logger.warning(f'SMTP not fully configured - missing fields: {", ".join(missing)}')
 
-        # If email verification is enabled but SMTP cannot actually send, fall back to direct signup.
+        # Surface SMTP misconfiguration loudly when verification is required.
         if app.config.get('REQUIRE_EMAIL_VERIFICATION') and not all([smtp_host, smtp_user, smtp_port, email_from, smtp_pass]):
-            app.config['REQUIRE_EMAIL_VERIFICATION'] = False
-            app.logger.warning('REQUIRE_EMAIL_VERIFICATION auto-disabled because SMTP is incomplete.')
+            app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but SMTP is incomplete.')
         app._smtp_logged = True
 
 # Simple in-memory user store (for demo only)
@@ -1289,50 +1288,17 @@ The SkillForge Team
                 app.logger.info(f'Registration email sent to {email}')
             else:
                 app.logger.warning(f'Failed to send registration email to {email}: {error_msg}')
-                err_l = (error_msg or '').lower()
-                # If SMTP fails, do not block onboarding. Activate account directly.
-                app.config['REQUIRE_EMAIL_VERIFICATION'] = False
-                user = User(
-                    username=pending.username,
-                    email=pending.email,
-                    password_hash=pending.password_hash,
-                    email_verified=True
-                )
-                db.session.add(user)
                 db.session.delete(pending)
                 db.session.commit()
-
-                session['user'] = user.username
-                session['username'] = user.username
-                session['email'] = user.email
-                session['user_id'] = user.id
-
-                if 'name or service not known' in err_l or 'nodename nor servname provided' in err_l or 'getaddrinfo failed' in err_l:
-                    register_message = 'Signup completed. Email verification is temporarily disabled because SMTP host is unreachable.'
-                else:
-                    register_message = 'Signup completed. Email verification is temporarily disabled due to email server issues.'
-                register_status = 'success'
+                register_message = f'Registration failed: unable to send verification email ({error_msg}). Please try again.'
+                register_status = 'error'
         except Exception as exc:
             app.logger.error(f'Error sending/scheduling registration email for {email}: {exc}')
-            # Keep onboarding available even if mail delivery fails unexpectedly.
-            app.config['REQUIRE_EMAIL_VERIFICATION'] = False
-            user = User(
-                username=pending.username,
-                email=pending.email,
-                password_hash=pending.password_hash,
-                email_verified=True
-            )
-            db.session.add(user)
             db.session.delete(pending)
             db.session.commit()
 
-            session['user'] = user.username
-            session['username'] = user.username
-            session['email'] = user.email
-            session['user_id'] = user.id
-
-            register_message = 'Signup completed. Email verification is temporarily disabled due to email server issues.'
-            register_status = 'success'
+            register_message = f'Registration failed: unable to send verification email ({exc}). Please try again.'
+            register_status = 'error'
 
         # Don't auto-login - user must verify email first
         session.pop('csrf_token', None)
