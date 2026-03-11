@@ -1290,21 +1290,49 @@ The SkillForge Team
             else:
                 app.logger.warning(f'Failed to send registration email to {email}: {error_msg}')
                 err_l = (error_msg or '').lower()
-                if 'smtp not fully configured' in err_l:
-                    register_message = 'Verification email service is not configured yet. Please contact admin.'
-                elif 'authentication' in err_l or 'username and password not accepted' in err_l:
-                    register_message = 'Email server rejected login credentials. Please contact admin to fix SMTP settings.'
-                elif 'name or service not known' in err_l or 'nodename nor servname provided' in err_l or 'getaddrinfo failed' in err_l:
-                    register_message = 'SMTP host is invalid or unreachable. Please contact admin to check SMTP_HOST.'
-                elif 'timed out' in err_l:
-                    register_message = 'Email server timed out. Please try again in a moment.'
+                # If SMTP fails, do not block onboarding. Activate account directly.
+                app.config['REQUIRE_EMAIL_VERIFICATION'] = False
+                user = User(
+                    username=pending.username,
+                    email=pending.email,
+                    password_hash=pending.password_hash,
+                    email_verified=True
+                )
+                db.session.add(user)
+                db.session.delete(pending)
+                db.session.commit()
+
+                session['user'] = user.username
+                session['username'] = user.username
+                session['email'] = user.email
+                session['user_id'] = user.id
+
+                if 'name or service not known' in err_l or 'nodename nor servname provided' in err_l or 'getaddrinfo failed' in err_l:
+                    register_message = 'Signup completed. Email verification is temporarily disabled because SMTP host is unreachable.'
                 else:
-                    register_message = f'We could not send a confirmation email. Error: {error_msg}'
-                register_status = 'error'
+                    register_message = 'Signup completed. Email verification is temporarily disabled due to email server issues.'
+                register_status = 'success'
         except Exception as exc:
             app.logger.error(f'Error sending/scheduling registration email for {email}: {exc}')
-            register_message = f'We encountered an error sending a confirmation email. Error: {exc}'
-            register_status = 'error'
+            # Keep onboarding available even if mail delivery fails unexpectedly.
+            app.config['REQUIRE_EMAIL_VERIFICATION'] = False
+            user = User(
+                username=pending.username,
+                email=pending.email,
+                password_hash=pending.password_hash,
+                email_verified=True
+            )
+            db.session.add(user)
+            db.session.delete(pending)
+            db.session.commit()
+
+            session['user'] = user.username
+            session['username'] = user.username
+            session['email'] = user.email
+            session['user_id'] = user.id
+
+            register_message = 'Signup completed. Email verification is temporarily disabled due to email server issues.'
+            register_status = 'success'
 
         # Don't auto-login - user must verify email first
         session.pop('csrf_token', None)
@@ -1312,6 +1340,8 @@ The SkillForge Team
             flash(register_message, register_status or 'success')
         if register_status == 'success':
             flash('IMPORTANT: Please click the verification link in your email within 3 minutes to complete registration.', 'warning')
+        if register_status == 'success' and session.get('user'):
+            return redirect(url_for('dashboard'))
         return redirect(url_for('login'))
 
     # GET: set CSRF
