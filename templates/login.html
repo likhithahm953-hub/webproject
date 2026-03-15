@@ -20,7 +20,7 @@
         <p class="quote">"Consistency is the key — keep learning, keep growing!"</p>
         <form method="POST" id="login-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="text" name="identifier" id="identifier" placeholder="Enter Username" required>
+            <input type="text" name="identifier" id="identifier" placeholder="Enter Username or Email" required>
             <div class="pw-row">
                 <input type="password" name="password" id="login-password" placeholder="Enter Password" required>
                 <button type="button" class="toggle-password" data-target="login-password" aria-pressed="false" aria-label="Show password"></button>

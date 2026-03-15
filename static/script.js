@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Password strength and signup validation
+    // Password strength and email validation (Signup form)
     const signupForm = document.getElementById('signup-form');
     if (signupForm) {
         const emailInput = document.getElementById('email');
@@ -283,12 +283,10 @@ document.addEventListener('DOMContentLoaded', function() {
             pwInlineErrors.textContent = '';
             if (confirmInlineErrors) confirmInlineErrors.textContent = '';
 
-            if (emailInput && emailInput.value) {
-                const emailOk = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(emailInput.value);
-                if (!emailOk) {
-                    inlineErrors.textContent = 'Enter a correct email like name@example.com';
-                    return false;
-                }
+            const emailOk = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(emailInput.value);
+            if (!emailOk) {
+                inlineErrors.textContent = 'Enter a correct email like name@example.com';
+                return false;
             }
             return true;
         }

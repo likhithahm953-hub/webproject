@@ -48,11 +48,11 @@ app.config.setdefault('EMAIL_FROM', os.environ.get('EMAIL_FROM', ''))
 app.config.setdefault('SMTP_ALLOW_INSECURE', os.environ.get('SMTP_ALLOW_INSECURE', 'false'))
 app.config.setdefault(
     'SMTP_USE_AUTH',
-    str(os.environ.get('SMTP_USE_AUTH', 'false')).lower() in ('1', 'true', 'yes')
+    str(os.environ.get('SMTP_USE_AUTH', 'true')).lower() in ('1', 'true', 'yes')
 )
 app.config.setdefault(
     'REQUIRE_EMAIL_VERIFICATION',
-    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'false')).lower() in ('1', 'true', 'yes')
+    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'true')).lower() in ('1', 'true', 'yes')
 )
 
 # Log SMTP configuration on startup (for debugging)
@@ -905,6 +905,13 @@ def _verify_user_password(user, candidate_password):
     return is_match, False
 
 
+def _pending_registration_is_expired(pending):
+    if not pending or not pending.token_created_at:
+        return True
+    elapsed = (datetime.datetime.utcnow() - pending.token_created_at).total_seconds()
+    return elapsed > 180
+
+
 def require_admin():
     if not session.get('user'):
         flash('Please log in to continue.', 'error')
@@ -1070,8 +1077,12 @@ def signup():
         password = request.form.get('password', '')
         confirm = request.form.get('confirm_password', '')
 
-        if not username or not password or not confirm:
+        if not username or not email or not password or not confirm:
             flash('Please fill in all fields.', 'error')
+            return redirect(url_for('signup'))
+
+        if not is_valid_email(email):
+            flash('Email address is invalid. Use format name@example.com', 'error')
             return redirect(url_for('signup'))
 
         existing_username_user = User.query.filter(
@@ -1090,24 +1101,11 @@ def signup():
             flash('Password does not meet rules: ' + '; '.join(errors), 'error')
             return redirect(url_for('signup'))
 
-        # Email is optional in UI now. Generate a stable local email when omitted.
-        if email:
-            if not is_valid_email(email):
-                flash('Email address is invalid. Use format name@example.com', 'error')
-                return redirect(url_for('signup'))
-            if User.query.filter(func.lower(User.email) == email.lower()).first():
-                flash('Email already registered.', 'error')
-                return redirect(url_for('signup'))
-        else:
-            base_local = re.sub(r'[^a-z0-9._-]+', '', username.lower()) or 'user'
-            candidate = f'{base_local}@skillforge.local'
-            suffix = 1
-            while User.query.filter(func.lower(User.email) == candidate.lower()).first():
-                candidate = f'{base_local}{suffix}@skillforge.local'
-                suffix += 1
-            email = candidate
+        if User.query.filter(func.lower(User.email) == email.lower()).first():
+            flash('Email already registered.', 'error')
+            return redirect(url_for('signup'))
 
-        # Clean up any stale pending rows for this username/email.
+        # Replace any existing pending row for this username/email with a fresh token.
         pending_rows = PendingRegistration.query.filter(
             or_(
                 func.lower(PendingRegistration.username) == username.lower(),
@@ -1117,23 +1115,70 @@ def signup():
         for row in pending_rows:
             db.session.delete(row)
 
-        user = User(
+        verification_token = secrets.token_urlsafe(32)
+        pending = PendingRegistration(
             username=username,
             email=email,
             password_hash=generate_password_hash(password),
-            email_verified=True
+            token=verification_token,
+            token_created_at=datetime.datetime.utcnow()
         )
-        db.session.add(user)
+        db.session.add(pending)
         db.session.commit()
 
-        session.pop('csrf_token', None)
-        session['user'] = user.username
-        session['username'] = user.username
-        session['email'] = user.email
-        session['user_id'] = user.id
+        base_url = app.config.get('SERVER_BASE_URL')
+        if base_url:
+            verification_link = base_url.rstrip('/') + url_for('verify_email', token=verification_token)
+        else:
+            verification_link = url_for('verify_email', token=verification_token, _external=True)
 
-        flash('Signup successful. You are now logged in.', 'success')
-        return redirect(url_for('dashboard'))
+        subject = 'Verify your email - SkillForge'
+        plain_text = f"""Hello {username},
+
+Please verify your email to complete your SkillForge registration.
+
+Click the link below within 3 minutes:
+{verification_link}
+
+If you did not request this account, you can ignore this email.
+
+Best regards,
+The SkillForge Team
+"""
+        body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=\"UTF-8\">
+    <style>
+        body {{ font-family: Arial, sans-serif; background: #f8fafc; color: #0f172a; }}
+        .card {{ max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 12px; padding: 32px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); }}
+        .button {{ display: inline-block; padding: 12px 24px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; }}
+        .muted {{ color: #64748b; font-size: 14px; }}
+    </style>
+</head>
+<body>
+    <div class=\"card\">
+        <h2>Verify your email</h2>
+        <p>Hello {username},</p>
+        <p>Please verify your email to complete your SkillForge registration.</p>
+        <p><a class=\"button\" href=\"{verification_link}\">Verify Email</a></p>
+        <p class=\"muted\">This link expires in 3 minutes.</p>
+        <p class=\"muted\">If you did not request this account, you can ignore this email.</p>
+    </div>
+</body>
+</html>
+"""
+
+        sent, error_msg = _send_email_detailed(email, subject, body, is_html=True, plain_text=plain_text)
+
+        session.pop('csrf_token', None)
+        if sent:
+            flash('Registration started. Please verify your email to complete registration.', 'success')
+            flash('Please click the verification link in your email within 3 minutes to activate your account.', 'warning')
+            return redirect(url_for('login'))
+
+        flash(f'Registration is pending, but the verification email could not be sent ({error_msg}). Please try again after checking SMTP configuration.', 'error')
+        return redirect(url_for('signup'))
 
     # GET: set CSRF
     csrf_token = secrets.token_urlsafe(16)
@@ -4019,26 +4064,20 @@ def login():
                     func.lower(PendingRegistration.username) == normalized_identifier
                 ).first()
 
-        # Always auto-activate pending accounts so users are not blocked.
         if user is None and pending_account:
+            if _pending_registration_is_expired(pending_account):
+                db.session.delete(pending_account)
+                db.session.commit()
+                flash('Your verification link has expired. Please register again.', 'warning')
+                return redirect(url_for('signup'))
+
             pending_ok, pending_was_legacy = _password_matches(pending_account.password_hash, password)
             if not pending_ok:
                 flash('Incorrect password. Please try again.', 'error')
                 return redirect(url_for('login'))
 
-            user = User.query.filter(User.username == pending_account.username).first()
-            if not user:
-                user = User.query.filter(func.lower(User.email) == pending_account.email.lower()).first()
-            if user is None:
-                user = User(
-                    username=pending_account.username,
-                    email=pending_account.email,
-                    password_hash=generate_password_hash(password) if pending_was_legacy else pending_account.password_hash,
-                    email_verified=True
-                )
-                db.session.add(user)
-                db.session.delete(pending_account)
-                db.session.commit()
+            flash('Your account is pending email verification. Please check your inbox and verify your email before logging in.', 'warning')
+            return redirect(url_for('login'))
 
         if user is None:
             flash('Account not found. Please sign up first.', 'error')
@@ -4050,6 +4089,10 @@ def login():
             return redirect(url_for('login'))
         if upgraded_hash:
             db.session.commit()
+
+        if app.config.get('REQUIRE_EMAIL_VERIFICATION', True) and not user.email_verified:
+            flash('Please verify your email first. Check your inbox for the verification link.', 'warning')
+            return redirect(url_for('login'))
 
         # clear CSRF after successful POST
         session.pop('csrf_token', None)
@@ -4084,15 +4127,13 @@ def verify_email(token):
         return redirect(url_for('login'))
     
     # Check if token is expired (3 minutes = 180 seconds)
-    if pending.token_created_at:
-        elapsed = (datetime.datetime.utcnow() - pending.token_created_at).total_seconds()
-        if elapsed > 180:  # 3 minutes
-            flash('Verification link has expired. Please register again.', 'error')
-            db.session.delete(pending)
-            db.session.commit()
-            return redirect(url_for('signup'))
+    if _pending_registration_is_expired(pending):
+        flash('Verification link has expired. Please register again.', 'error')
+        db.session.delete(pending)
+        db.session.commit()
+        return redirect(url_for('signup'))
 
-    if User.query.filter_by(username=pending.username).first() or User.query.filter_by(email=pending.email).first():
+    if User.query.filter(func.lower(User.username) == pending.username.lower()).first() or User.query.filter(func.lower(User.email) == pending.email.lower()).first():
         db.session.delete(pending)
         db.session.commit()
         flash('Account already exists. Please log in.', 'info')
