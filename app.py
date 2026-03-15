@@ -3,6 +3,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import re
 import os
 import secrets
+import socket
 import smtplib
 import ssl
 from email.mime.text import MIMEText
@@ -905,6 +906,50 @@ def _verify_user_password(user, candidate_password):
     return is_match, False
 
 
+def _smtp_connect_hosts(host, port):
+    """Return resolved SMTP targets, preferring IPv4 when available."""
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except socket.gaierror:
+        return [None]
+
+    targets = []
+    seen = set()
+    for family, _socktype, _proto, _canonname, sockaddr in infos:
+        connect_host = sockaddr[0]
+        key = (family, connect_host)
+        if key in seen:
+            continue
+        seen.add(key)
+        targets.append((family, connect_host))
+
+    targets.sort(key=lambda item: 0 if item[0] == socket.AF_INET else 1)
+    return [connect_host for _family, connect_host in targets] or [None]
+
+
+class _ResolvedSMTP(smtplib.SMTP):
+    def __init__(self, *args, connect_host=None, **kwargs):
+        self._connect_host = connect_host
+        super().__init__(*args, **kwargs)
+
+    def _get_socket(self, host, port, timeout):
+        if self.debuglevel > 0:
+            self._print_debug('connect:', (self._connect_host or host, port))
+        return socket.create_connection((self._connect_host or host, port), timeout, self.source_address)
+
+
+class _ResolvedSMTP_SSL(smtplib.SMTP_SSL):
+    def __init__(self, *args, connect_host=None, **kwargs):
+        self._connect_host = connect_host
+        super().__init__(*args, **kwargs)
+
+    def _get_socket(self, host, port, timeout):
+        if self.debuglevel > 0:
+            self._print_debug('connect:', (self._connect_host or host, port))
+        new_socket = socket.create_connection((self._connect_host or host, port), timeout, self.source_address)
+        return self.context.wrap_socket(new_socket, server_hostname=host)
+
+
 def _pending_registration_is_expired(pending):
     if not pending or not pending.token_created_at:
         return True
@@ -1016,38 +1061,42 @@ def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None)
     
     message = msg.as_string()
 
-    try:
-        if port == 465:
-            context = ssl.create_default_context(cafile=certifi.where()) if certifi else ssl.create_default_context()
-            if allow_insecure:
-                context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
-            with smtplib.SMTP_SSL(host, port, context=context, timeout=15) as server:
-                server.ehlo()
-                if use_auth:
-                    server.login(user, password)
-                server.sendmail(from_addr, [to_addr], message)
-        else:
-            context = ssl.create_default_context(cafile=certifi.where()) if certifi else ssl.create_default_context()
-            if allow_insecure:
-                context.check_hostname = False
-                context.verify_mode = ssl.CERT_NONE
-            with smtplib.SMTP(host, port, timeout=15) as server:
-                server.ehlo()
-                server.starttls(context=context)
-                server.ehlo()
-                if use_auth:
-                    server.login(user, password)
-                server.sendmail(from_addr, [to_addr], message)
-        msg = f'Email sent to {to_addr}: {subject}'
-        app.logger.info(msg)
-        print(f'OK: {msg}')
-        return True, ''
-    except Exception as exc:
-        error_msg = f'Failed to send email to {to_addr}: {exc}'
-        app.logger.error(error_msg)
-        print(f'ERROR: {error_msg}')
-        return False, str(exc)
+    last_error = None
+    for connect_host in _smtp_connect_hosts(host, port):
+        try:
+            if port == 465:
+                context = ssl.create_default_context(cafile=certifi.where()) if certifi else ssl.create_default_context()
+                if allow_insecure:
+                    context.check_hostname = False
+                    context.verify_mode = ssl.CERT_NONE
+                with _ResolvedSMTP_SSL(host=host, port=port, context=context, timeout=15, connect_host=connect_host) as server:
+                    server.ehlo()
+                    if use_auth:
+                        server.login(user, password)
+                    server.sendmail(from_addr, [to_addr], message)
+            else:
+                context = ssl.create_default_context(cafile=certifi.where()) if certifi else ssl.create_default_context()
+                if allow_insecure:
+                    context.check_hostname = False
+                    context.verify_mode = ssl.CERT_NONE
+                with _ResolvedSMTP(host=host, port=port, timeout=15, connect_host=connect_host) as server:
+                    server.ehlo()
+                    server.starttls(context=context)
+                    server.ehlo()
+                    if use_auth:
+                        server.login(user, password)
+                    server.sendmail(from_addr, [to_addr], message)
+            msg = f'Email sent to {to_addr}: {subject}'
+            app.logger.info(msg)
+            print(f'OK: {msg}')
+            return True, ''
+        except Exception as exc:
+            last_error = exc
+
+    error_msg = f'Failed to send email to {to_addr}: {last_error}'
+    app.logger.error(error_msg)
+    print(f'ERROR: {error_msg}')
+    return False, str(last_error)
 
 
 def send_email_async(to_addr, subject, body, is_html=False, plain_text=None):
