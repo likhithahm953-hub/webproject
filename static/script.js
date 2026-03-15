@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Password strength and email validation (Signup form)
+    // Password strength and signup validation
     const signupForm = document.getElementById('signup-form');
     if (signupForm) {
         const emailInput = document.getElementById('email');
@@ -245,13 +245,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        emailInput.addEventListener('input', function() {
-            const re = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
-            const hint = document.getElementById('email-hint');
-            if (!this.value) { hint.textContent = ''; hint.classList.remove('valid','invalid'); }
-            else if (re.test(this.value)) { hint.textContent = ''; hint.classList.add('valid'); hint.classList.remove('invalid'); }
-            else { hint.textContent = 'Enter a correct email like name@example.com'; hint.classList.add('invalid'); hint.classList.remove('valid'); }
-        });
+        if (emailInput) {
+            emailInput.addEventListener('input', function() {
+                const re = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/;
+                const hint = document.getElementById('email-hint');
+                if (!hint) return;
+                if (!this.value) { hint.textContent = ''; hint.classList.remove('valid','invalid'); }
+                else if (re.test(this.value)) { hint.textContent = ''; hint.classList.add('valid'); hint.classList.remove('invalid'); }
+                else { hint.textContent = 'Enter a correct email like name@example.com'; hint.classList.add('invalid'); hint.classList.remove('valid'); }
+            });
+        }
 
         function validateForm() {
             inlineErrors.textContent = '';
@@ -280,10 +283,12 @@ document.addEventListener('DOMContentLoaded', function() {
             pwInlineErrors.textContent = '';
             if (confirmInlineErrors) confirmInlineErrors.textContent = '';
 
-            const emailOk = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(emailInput.value);
-            if (!emailOk) {
-                inlineErrors.textContent = 'Enter a correct email like name@example.com';
-                return false;
+            if (emailInput && emailInput.value) {
+                const emailOk = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(emailInput.value);
+                if (!emailOk) {
+                    inlineErrors.textContent = 'Enter a correct email like name@example.com';
+                    return false;
+                }
             }
             return true;
         }

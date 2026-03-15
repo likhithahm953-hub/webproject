@@ -47,8 +47,12 @@ app.config.setdefault('SMTP_PASS', os.environ.get('SMTP_PASS', ''))
 app.config.setdefault('EMAIL_FROM', os.environ.get('EMAIL_FROM', ''))
 app.config.setdefault('SMTP_ALLOW_INSECURE', os.environ.get('SMTP_ALLOW_INSECURE', 'false'))
 app.config.setdefault(
+    'SMTP_USE_AUTH',
+    str(os.environ.get('SMTP_USE_AUTH', 'false')).lower() in ('1', 'true', 'yes')
+)
+app.config.setdefault(
     'REQUIRE_EMAIL_VERIFICATION',
-    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'true')).lower() in ('1', 'true', 'yes')
+    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'false')).lower() in ('1', 'true', 'yes')
 )
 
 # Log SMTP configuration on startup (for debugging)
@@ -875,6 +879,32 @@ def is_valid_email(email):
     return re.match(pattern, email) is not None
 
 
+def _password_matches(stored_password, candidate_password):
+    """Return (is_match, was_legacy_plain_text)."""
+    if not stored_password:
+        return False, False
+
+    stored = str(stored_password)
+    # Werkzeug hashes in this app are prefixed by scheme, for example scrypt:/pbkdf2:.
+    if stored.startswith('scrypt:') or stored.startswith('pbkdf2:'):
+        try:
+            return check_password_hash(stored, candidate_password), False
+        except Exception:
+            return False, False
+
+    # Backward compatibility for legacy/plain-text rows.
+    return secrets.compare_digest(stored, str(candidate_password)), True
+
+
+def _verify_user_password(user, candidate_password):
+    """Verify user password and transparently upgrade legacy plain-text storage."""
+    is_match, was_legacy = _password_matches(user.password_hash, candidate_password)
+    if is_match and was_legacy:
+        user.password_hash = generate_password_hash(candidate_password)
+        return True, True
+    return is_match, False
+
+
 def require_admin():
     if not session.get('user'):
         flash('Please log in to continue.', 'error')
@@ -900,6 +930,7 @@ def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None)
     password = app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS')
     from_addr = app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or user
     allow_insecure_raw = app.config.get('SMTP_ALLOW_INSECURE') or os.environ.get('SMTP_ALLOW_INSECURE') or 'false'
+    use_auth_raw = app.config.get('SMTP_USE_AUTH')
 
     # Normalize config values so accidental spaces/newlines from env vars don't break SMTP.
     host = str(host).strip() if host is not None else ''
@@ -933,15 +964,20 @@ def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None)
     else:
         allow_insecure = str(allow_insecure_raw).lower() in ('1', 'true', 'yes')
 
+    if isinstance(use_auth_raw, bool):
+        use_auth = use_auth_raw
+    else:
+        use_auth = str(use_auth_raw).lower() in ('1', 'true', 'yes')
+
     missing = []
     if not host:
         missing.append('SMTP_HOST')
-    if not user:
-        missing.append('SMTP_USER')
-    if not password:
-        missing.append('SMTP_PASS')
     if not from_addr:
         missing.append('EMAIL_FROM')
+    if use_auth and not user:
+        missing.append('SMTP_USER')
+    if use_auth and not password:
+        missing.append('SMTP_PASS')
 
     if missing:
         msg = 'SMTP not fully configured. Missing: ' + ', '.join(missing)
@@ -981,7 +1017,8 @@ def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None)
                 context.verify_mode = ssl.CERT_NONE
             with smtplib.SMTP_SSL(host, port, context=context, timeout=15) as server:
                 server.ehlo()
-                server.login(user, password)
+                if use_auth:
+                    server.login(user, password)
                 server.sendmail(from_addr, [to_addr], message)
         else:
             context = ssl.create_default_context(cafile=certifi.where()) if certifi else ssl.create_default_context()
@@ -992,7 +1029,8 @@ def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None)
                 server.ehlo()
                 server.starttls(context=context)
                 server.ehlo()
-                server.login(user, password)
+                if use_auth:
+                    server.login(user, password)
                 server.sendmail(from_addr, [to_addr], message)
         msg = f'Email sent to {to_addr}: {subject}'
         app.logger.info(msg)
@@ -1032,49 +1070,16 @@ def signup():
         password = request.form.get('password', '')
         confirm = request.form.get('confirm_password', '')
 
-        if not username or not email or not password or not confirm:
+        if not username or not password or not confirm:
             flash('Please fill in all fields.', 'error')
             return redirect(url_for('signup'))
 
-        if not is_valid_email(email):
-            flash('Email address is invalid. Use format name@example.com', 'error')
-            return redirect(url_for('signup'))
-
-        def _purge_pending_if_expired(pending):
-            if not pending:
-                return False
-            if pending.token_created_at:
-                elapsed = (datetime.datetime.utcnow() - pending.token_created_at).total_seconds()
-                if elapsed > 180:
-                    db.session.delete(pending)
-                    db.session.commit()
-                    return True
-                return False
-            db.session.delete(pending)
-            db.session.commit()
-            return True
-
-        existing_username_user = User.query.filter_by(username=username).first()
+        existing_username_user = User.query.filter(
+            func.lower(User.username) == username.lower()
+        ).first()
         if existing_username_user:
             flash('Username already registered.', 'error')
             return redirect(url_for('signup'))
-
-        existing_email_user = User.query.filter_by(email=email).first()
-        if existing_email_user:
-            flash('Email already registered.', 'error')
-            return redirect(url_for('signup'))
-
-        pending_username = PendingRegistration.query.filter_by(username=username).first()
-        if pending_username:
-            if not _purge_pending_if_expired(pending_username):
-                flash('Username is pending verification. Please check your email or try again in 3 minutes.', 'error')
-                return redirect(url_for('signup'))
-
-        pending_email = PendingRegistration.query.filter_by(email=email).first()
-        if pending_email:
-            if not _purge_pending_if_expired(pending_email):
-                flash('Email is pending verification. Please check your email or try again in 3 minutes.', 'error')
-                return redirect(url_for('signup'))
 
         if password != confirm:
             flash('Passwords do not match.', 'error')
@@ -1085,230 +1090,50 @@ def signup():
             flash('Password does not meet rules: ' + '; '.join(errors), 'error')
             return redirect(url_for('signup'))
 
-        # Fallback mode: allow normal signup when email verification is disabled.
-        if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
-            user = User(
-                username=username,
-                email=email,
-                password_hash=generate_password_hash(password),
-                email_verified=True
+        # Email is optional in UI now. Generate a stable local email when omitted.
+        if email:
+            if not is_valid_email(email):
+                flash('Email address is invalid. Use format name@example.com', 'error')
+                return redirect(url_for('signup'))
+            if User.query.filter(func.lower(User.email) == email.lower()).first():
+                flash('Email already registered.', 'error')
+                return redirect(url_for('signup'))
+        else:
+            base_local = re.sub(r'[^a-z0-9._-]+', '', username.lower()) or 'user'
+            candidate = f'{base_local}@skillforge.local'
+            suffix = 1
+            while User.query.filter(func.lower(User.email) == candidate.lower()).first():
+                candidate = f'{base_local}{suffix}@skillforge.local'
+                suffix += 1
+            email = candidate
+
+        # Clean up any stale pending rows for this username/email.
+        pending_rows = PendingRegistration.query.filter(
+            or_(
+                func.lower(PendingRegistration.username) == username.lower(),
+                func.lower(PendingRegistration.email) == email.lower()
             )
-            db.session.add(user)
-            db.session.commit()
+        ).all()
+        for row in pending_rows:
+            db.session.delete(row)
 
-            session.pop('csrf_token', None)
-            session['user'] = user.username
-            session['username'] = user.username
-            session['email'] = user.email
-            session['user_id'] = user.id
-
-            flash('Signup successful. Email verification is currently disabled.', 'success')
-            return redirect(url_for('dashboard'))
-
-        # create pending registration and send verification email
-        verification_token = secrets.token_urlsafe(32)
-        pending = PendingRegistration(
+        user = User(
             username=username,
             email=email,
             password_hash=generate_password_hash(password),
-            token=verification_token,
-            token_created_at=datetime.datetime.utcnow()
+            email_verified=True
         )
-        db.session.add(pending)
+        db.session.add(user)
         db.session.commit()
 
-        # send welcome/registration email with verification link
-        base_url = app.config.get('SERVER_BASE_URL')
-        if base_url:
-            verification_link = base_url.rstrip('/') + url_for('verify_email', token=verification_token)
-        else:
-            verification_link = url_for('verify_email', token=verification_token, _external=True)
-        
-        subject = 'Verify your email - SkillForge'
-        
-        # Plain text version for fallback
-        plain_text = f"""Hello {username},
-
-Please verify your email to complete your SkillForge registration.
-
-Click the link below (valid for 3 minutes):
-{verification_link}
-
-Once verified, your account will be activated and ready to use.
-
-You can now:
-- Explore courses across Python, Web Development, Machine Learning, and more
-- Track your progress with interactive dashboards
-- Earn certificates and showcase your achievements
-
-Best regards,
-The SkillForge Team
-"""
-        
-        # HTML version
-        body = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body {{
-            font-family: 'Inter', Arial, sans-serif;
-            background-color: #f8fafc;
-            margin: 0;
-            padding: 0;
-        }}
-        .email-container {{
-            max-width: 600px;
-            margin: 20px auto;
-            background-color: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }}
-        .header {{
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            padding: 30px 20px;
-            text-align: center;
-            color: white;
-        }}
-        .logo-img {{
-            width: 56px;
-            height: 56px;
-            margin: 0 auto 10px;
-            border-radius: 14px;
-            display: block;
-        }}
-        .title {{
-            font-size: 24px;
-            font-weight: 700;
-            margin: 0;
-        }}
-        .content {{
-            padding: 30px 20px;
-            color: #0f172a;
-        }}
-        .greeting {{
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            color: #0f172a;
-        }}
-        .section {{
-            margin: 20px 0;
-            line-height: 1.6;
-        }}
-        .section-title {{
-            font-weight: 600;
-            color: #6366f1;
-            margin-bottom: 10px;
-        }}
-        .section ul {{
-            margin: 10px 0;
-            padding-left: 20px;
-        }}
-        .section li {{
-            margin: 8px 0;
-        }}
-        .footer {{
-            background-color: #f8fafc;
-            padding: 20px;
-            text-align: center;
-            font-size: 14px;
-            color: #64748b;
-            border-top: 1px solid #e2e8f0;
-        }}
-        .footer-sign {{
-            font-weight: 600;
-            color: #6366f1;
-        }}
-        .verify-button {{
-            display: inline-block;
-            padding: 12px 32px;
-            margin: 20px 0;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: white;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 16px;
-            border: none;
-            cursor: pointer;
-        }}
-        .verify-button:hover {{
-            opacity: 0.9;
-            text-decoration: none;
-        }}
-    </style>
-</head>
-<body>
-    <div class="email-container">
-        <div class="header">
-            <img class="logo-img" alt="SkillForge" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 512 512'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%' stop-color='%236366f1'/><stop offset='100%' stop-color='%238b5cf6'/></linearGradient></defs><rect width='512' height='512' rx='96' fill='url(%23g)'/><g fill='none' stroke='%23ffffff' stroke-width='16' stroke-linecap='round' stroke-linejoin='round'><path d='M96 220l160-72 160 72-160 72-160-72z' fill='rgba(255,255,255,0.15)'/><path d='M160 260v68c0 26 43 52 96 52s96-26 96-52v-68'/><path d='M416 220v92'/><circle cx='416' cy='328' r='16' fill='%23ffffff'/></g></svg>" />
-            <h1 class="title">SkillForge</h1>
-        </div>
-        <div class="content">
-            <div class="greeting">Hello {username},</div>
-            <div class="section" style="text-align: center;">
-                <a href="{verification_link}" class="verify-button">Verify Your Email</a>
-                <p style="font-size: 12px; color: #64748b; margin-top: 10px;">This link expires in 3 minutes.</p>
-            </div>
-            <div class="section">
-                <p><strong>You're almost done! Please verify your email to complete registration.</strong></p>
-                <p>Once verified, your account will be activated and ready to use.</p>
-            </div>
-            <div class="section">
-                <div class="section-title">Here's what you can do next:</div>
-                <ul>
-                    <li>Explore courses across Python, Web Development, Machine Learning, and more.</li>
-                    <li>Track your progress with interactive dashboards.</li>
-                    <li>Earn certificates and showcase your achievements.</li>
-                </ul>
-            </div>
-            <div class="section">
-                <p>We're excited to have you on board. Let's make learning engaging, interactive, and rewarding!</p>
-                <p><strong>Happy Learning,</strong></p>
-                <p class="footer-sign">The SkillForge Team</p>
-                <p><em>SkillForge</em></p>
-                <p><em>SkillForge</em></p>
-            </div>
-        </div>
-        <div class="footer">
-            <p>&copy; 2024 SkillForge. All rights reserved.</p>
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-        try:
-            sent, error_msg = _send_email_detailed(email, subject, body, is_html=True, plain_text=plain_text)
-            if sent:
-                register_message = 'Registration started. Please verify your email to complete registration.'
-                register_status = 'success'
-                app.logger.info(f'Registration email sent to {email}')
-            else:
-                app.logger.warning(f'Failed to send registration email to {email}: {error_msg}')
-                db.session.delete(pending)
-                db.session.commit()
-                register_message = f'Registration failed: unable to send verification email ({error_msg}). Please try again.'
-                register_status = 'error'
-        except Exception as exc:
-            app.logger.error(f'Error sending/scheduling registration email for {email}: {exc}')
-            db.session.delete(pending)
-            db.session.commit()
-
-            register_message = f'Registration failed: unable to send verification email ({exc}). Please try again.'
-            register_status = 'error'
-
-        # Don't auto-login - user must verify email first
         session.pop('csrf_token', None)
-        if register_message:
-            flash(register_message, register_status or 'success')
-        if register_status == 'success':
-            flash('IMPORTANT: Please click the verification link in your email within 3 minutes to complete registration.', 'warning')
-        if register_status == 'success' and session.get('user'):
-            return redirect(url_for('dashboard'))
-        return redirect(url_for('login'))
+        session['user'] = user.username
+        session['username'] = user.username
+        session['email'] = user.email
+        session['user_id'] = user.id
+
+        flash('Signup successful. You are now logged in.', 'success')
+        return redirect(url_for('dashboard'))
 
     # GET: set CSRF
     csrf_token = secrets.token_urlsafe(16)
@@ -4173,40 +3998,42 @@ def login():
             flash('Please provide both identifier and password.', 'error')
             return redirect(url_for('login'))
 
-        # Find user by username/email (both case-insensitive).
-        user = User.query.filter(
-            or_(
-                func.lower(User.username) == normalized_identifier,
-                func.lower(User.email) == normalized_identifier
-            )
-        ).first()
+        # Prefer exact username match first to avoid ambiguous case-insensitive collisions.
+        user = User.query.filter(User.username == identifier).first()
+        if not user:
+            user = User.query.filter(func.lower(User.email) == normalized_identifier).first()
+        if not user:
+            user = User.query.filter(func.lower(User.username) == normalized_identifier).first()
 
         pending_account = None
         if not user:
             pending_account = PendingRegistration.query.filter(
-                or_(
-                    func.lower(PendingRegistration.username) == normalized_identifier,
-                    func.lower(PendingRegistration.email) == normalized_identifier
-                )
+                PendingRegistration.username == identifier
             ).first()
+            if not pending_account:
+                pending_account = PendingRegistration.query.filter(
+                    func.lower(PendingRegistration.email) == normalized_identifier
+                ).first()
+            if not pending_account:
+                pending_account = PendingRegistration.query.filter(
+                    func.lower(PendingRegistration.username) == normalized_identifier
+                ).first()
 
-        # In fallback mode, auto-activate pending accounts so users are not blocked.
-        if user is None and pending_account and not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
-            if not check_password_hash(pending_account.password_hash, password):
+        # Always auto-activate pending accounts so users are not blocked.
+        if user is None and pending_account:
+            pending_ok, pending_was_legacy = _password_matches(pending_account.password_hash, password)
+            if not pending_ok:
                 flash('Incorrect password. Please try again.', 'error')
                 return redirect(url_for('login'))
 
-            user = User.query.filter(
-                or_(
-                    func.lower(User.username) == normalized_identifier,
-                    func.lower(User.email) == normalized_identifier
-                )
-            ).first()
+            user = User.query.filter(User.username == pending_account.username).first()
+            if not user:
+                user = User.query.filter(func.lower(User.email) == pending_account.email.lower()).first()
             if user is None:
                 user = User(
                     username=pending_account.username,
                     email=pending_account.email,
-                    password_hash=pending_account.password_hash,
+                    password_hash=generate_password_hash(password) if pending_was_legacy else pending_account.password_hash,
                     email_verified=True
                 )
                 db.session.add(user)
@@ -4214,20 +4041,15 @@ def login():
                 db.session.commit()
 
         if user is None:
-            if pending_account:
-                flash('Your account is pending email verification. Please verify from your email, then log in.', 'warning')
-                return redirect(url_for('login'))
             flash('Account not found. Please sign up first.', 'error')
             return redirect(url_for('login'))
 
-        if not check_password_hash(user.password_hash, password):
+        password_ok, upgraded_hash = _verify_user_password(user, password)
+        if not password_ok:
             flash('Incorrect password. Please try again.', 'error')
             return redirect(url_for('login'))
-
-        # Check if email is verified
-        if app.config.get('REQUIRE_EMAIL_VERIFICATION', True) and not user.email_verified:
-            flash('Please verify your email first. Check your inbox for the verification link.', 'warning')
-            return redirect(url_for('login'))
+        if upgraded_hash:
+            db.session.commit()
 
         # clear CSRF after successful POST
         session.pop('csrf_token', None)
@@ -4660,7 +4482,8 @@ def update_email():
         return jsonify({'error': 'User not found'}), 404
     
     # Verify current password
-    if not check_password_hash(user.password_hash, password):
+    ok, _ = _verify_user_password(user, password)
+    if not ok:
         return jsonify({'error': 'Incorrect password'}), 401
     
     # Check if email already exists
@@ -4693,7 +4516,8 @@ def update_password():
         return jsonify({'error': 'User not found'}), 404
     
     # Verify current password
-    if not check_password_hash(user.password_hash, current_password):
+    ok, _ = _verify_user_password(user, current_password)
+    if not ok:
         return jsonify({'error': 'Current password is incorrect'}), 401
     
     # Validate new password strength
@@ -4732,7 +4556,8 @@ def update_username():
         return jsonify({'error': 'User not found'}), 404
     
     # Verify password
-    if not check_password_hash(user.password_hash, password):
+    ok, _ = _verify_user_password(user, password)
+    if not ok:
         return jsonify({'error': 'Incorrect password'}), 401
     
     # Check if username already exists
