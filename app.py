@@ -1,5 +1,6 @@
 ﻿from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 import re
 import os
 import secrets
@@ -33,6 +34,7 @@ except ImportError:
     gemini_model = None
 
 app = Flask(__name__, instance_relative_config=True)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 # In production set a real secret key via environment or config
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev')  # replace 'dev' in production (use env var) 
 app.config.from_pyfile('config.py', silent=True)
@@ -40,33 +42,55 @@ app.config.setdefault('LAUNCH_PIPELINE_URL', os.environ.get('LAUNCH_PIPELINE_URL
 app.config.setdefault('LAUNCH_PIPELINE_TIMEOUT_SECONDS', int(os.environ.get('LAUNCH_PIPELINE_TIMEOUT_SECONDS', '5')))
 app.config.setdefault('TEST_ALERT_INTERVAL_MINUTES', int(os.environ.get('TEST_ALERT_INTERVAL_MINUTES', '300')))
 app.config.setdefault('COURSE_COMPLETION_MINUTES', int(os.environ.get('COURSE_COMPLETION_MINUTES', '300')))
-app.config.setdefault('QUIZ_PASS_THRESHOLD', int(os.environ.get('QUIZ_PASS_THRESHOLD', '70')))
+app.config.setdefault('QUIZ_PASS_THRESHOLD', int(os.environ.get('QUIZ_PASS_THRESHOLD', '70'))) 
 app.config.setdefault('SMTP_HOST', os.environ.get('SMTP_HOST', ''))
 app.config.setdefault('SMTP_PORT', os.environ.get('SMTP_PORT', ''))
 app.config.setdefault('SMTP_USER', os.environ.get('SMTP_USER', ''))
 app.config.setdefault('SMTP_PASS', os.environ.get('SMTP_PASS', ''))
 app.config.setdefault('EMAIL_FROM', os.environ.get('EMAIL_FROM', ''))
+app.config.setdefault('EMAIL_PROVIDER', os.environ.get('EMAIL_PROVIDER', ''))
+app.config.setdefault('RESEND_API_KEY', os.environ.get('RESEND_API_KEY', ''))
+app.config.setdefault('RESEND_API_URL', os.environ.get('RESEND_API_URL', 'https://api.resend.com/emails'))
+app.config.setdefault('SERVER_BASE_URL', os.environ.get('SERVER_BASE_URL', ''))
 app.config.setdefault('SMTP_ALLOW_INSECURE', os.environ.get('SMTP_ALLOW_INSECURE', 'false'))
+app.config.setdefault('EMAIL_VERIFICATION_EXPIRY_SECONDS', int(os.environ.get('EMAIL_VERIFICATION_EXPIRY_SECONDS', '900')))
 app.config.setdefault(
     'SMTP_USE_AUTH',
     str(os.environ.get('SMTP_USE_AUTH', 'true')).lower() in ('1', 'true', 'yes')
 )
 app.config.setdefault(
     'REQUIRE_EMAIL_VERIFICATION',
-    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'true')).lower() in ('1', 'true', 'yes')
+    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'false')).lower() in ('1', 'true', 'yes')
 )
+# Force disable email verification for current deployment/demo mode.
+app.config['REQUIRE_EMAIL_VERIFICATION'] = False
 
 # Log SMTP configuration on startup (for debugging)
 @app.before_request
 def log_smtp_config():
     ensure_test_alert_dispatcher_started()
     if not hasattr(app, '_smtp_logged'):
+        email_provider = str(app.config.get('EMAIL_PROVIDER') or os.environ.get('EMAIL_PROVIDER') or '').strip().lower()
+        resend_api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
+        if not email_provider:
+            email_provider = 'resend' if resend_api_key else 'smtp'
+
         smtp_host = (app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST') or '').strip()
         smtp_user = (app.config.get('SMTP_USER') or os.environ.get('SMTP_USER') or '').strip()
         smtp_port = (str(app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '')).strip()
         email_from = (app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or '').strip()
         smtp_pass = (app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS') or '').strip()
-        if all([smtp_host, smtp_user, smtp_port, email_from]):
+        if email_provider == 'resend':
+            if resend_api_key and email_from:
+                app.logger.info(f'Email provider configured: provider=resend, from={email_from}')
+            else:
+                missing = []
+                if not resend_api_key:
+                    missing.append('RESEND_API_KEY')
+                if not email_from:
+                    missing.append('EMAIL_FROM')
+                app.logger.warning(f'Resend not fully configured - missing fields: {", ".join(missing)}')
+        elif all([smtp_host, smtp_user, smtp_port, email_from]):
             app.logger.info(f'SMTP configured: host={smtp_host}, user={smtp_user}, port={smtp_port}, from={email_from}')
         else:
             missing = []
@@ -80,9 +104,12 @@ def log_smtp_config():
                 missing.append('EMAIL_FROM')
             app.logger.warning(f'SMTP not fully configured - missing fields: {", ".join(missing)}')
 
-        # Surface SMTP misconfiguration loudly when verification is required.
-        if app.config.get('REQUIRE_EMAIL_VERIFICATION') and not all([smtp_host, smtp_user, smtp_port, email_from, smtp_pass]):
-            app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but SMTP is incomplete.')
+        # Surface email misconfiguration loudly when verification is required.
+        if app.config.get('REQUIRE_EMAIL_VERIFICATION'):
+            if email_provider == 'resend' and not all([resend_api_key, email_from]):
+                app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but Resend is incomplete.')
+            if email_provider != 'resend' and not all([smtp_host, smtp_user, smtp_port, email_from, smtp_pass]):
+                app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but SMTP is incomplete.')
         app._smtp_logged = True
 
 # Simple in-memory user store (for demo only)
@@ -954,7 +981,12 @@ def _pending_registration_is_expired(pending):
     if not pending or not pending.token_created_at:
         return True
     elapsed = (datetime.datetime.utcnow() - pending.token_created_at).total_seconds()
-    return elapsed > 180
+    return elapsed > int(app.config.get('EMAIL_VERIFICATION_EXPIRY_SECONDS', 900))
+
+
+def _email_verification_expiry_minutes():
+    expiry_seconds = max(int(app.config.get('EMAIL_VERIFICATION_EXPIRY_SECONDS', 900)), 60)
+    return max(1, expiry_seconds // 60)
 
 
 def require_admin():
@@ -974,8 +1006,88 @@ def _send_email(to_addr, subject, body):
     return ok
 
 
-def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None):
-    """Sends email synchronously. Returns (success, error_message)."""
+def _email_provider():
+    provider = str(app.config.get('EMAIL_PROVIDER') or os.environ.get('EMAIL_PROVIDER') or '').strip().lower()
+    if provider:
+        return provider
+    resend_api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
+    return 'resend' if resend_api_key else 'smtp'
+
+
+def _send_email_via_resend(to_addr, subject, body, is_html=False, plain_text=None):
+    api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
+    api_url = str(app.config.get('RESEND_API_URL') or os.environ.get('RESEND_API_URL') or 'https://api.resend.com/emails').strip()
+    from_addr = str(app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or '').strip()
+
+    missing = []
+    if not api_key:
+        missing.append('RESEND_API_KEY')
+    if not from_addr:
+        missing.append('EMAIL_FROM')
+    if missing:
+        msg = 'Resend not fully configured. Missing: ' + ', '.join(missing)
+        app.logger.warning(msg)
+        print(f'WARN: {msg}')
+        return False, msg
+
+    payload = {
+        'from': f'SkillForge <{from_addr}>',
+        'to': [to_addr],
+        'subject': subject,
+    }
+    if is_html:
+        payload['html'] = body
+        if plain_text:
+            payload['text'] = plain_text
+    else:
+        payload['text'] = plain_text or body
+
+    request_body = json.dumps(payload).encode('utf-8')
+    request_obj = urllib.request.Request(
+        api_url,
+        data=request_body,
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+        },
+        method='POST'
+    )
+
+    print(f'Sending email to: {to_addr}')
+    print(f'  Subject: {subject}')
+    print(f'  Via: resend ({api_url})')
+
+    try:
+        with urllib.request.urlopen(request_obj, timeout=15) as response:
+            response_body = response.read().decode('utf-8', errors='replace')
+            if 200 <= response.status < 300:
+                app.logger.info(f'Email sent to {to_addr}: {subject}')
+                print(f'OK: Email sent to {to_addr}: {subject}')
+                return True, ''
+            error_msg = f'Resend returned HTTP {response.status}: {response_body}'
+            app.logger.error(error_msg)
+            print(f'ERROR: {error_msg}')
+            return False, error_msg
+    except urllib.error.HTTPError as exc:
+        response_body = exc.read().decode('utf-8', errors='replace')
+        error_msg = f'Resend HTTP {exc.code}: {response_body}'
+        app.logger.error(error_msg)
+        print(f'ERROR: {error_msg}')
+        return False, error_msg
+    except urllib.error.URLError as exc:
+        error_msg = f'Resend connection failed: {exc.reason}'
+        app.logger.error(error_msg)
+        print(f'ERROR: {error_msg}')
+        return False, error_msg
+    except Exception as exc:
+        error_msg = f'Resend send failed: {exc}'
+        app.logger.error(error_msg)
+        print(f'ERROR: {error_msg}')
+        return False, error_msg
+
+
+def _send_email_via_smtp(to_addr, subject, body, is_html=False, plain_text=None):
+    """Sends email synchronously via SMTP. Returns (success, error_message)."""
     host = app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST')
     port_raw = app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '587'
     user = app.config.get('SMTP_USER') or os.environ.get('SMTP_USER')
@@ -1099,6 +1211,14 @@ def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None)
     return False, str(last_error)
 
 
+def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None):
+    """Sends email synchronously. Returns (success, error_message)."""
+    provider = _email_provider()
+    if provider == 'resend':
+        return _send_email_via_resend(to_addr, subject, body, is_html=is_html, plain_text=plain_text)
+    return _send_email_via_smtp(to_addr, subject, body, is_html=is_html, plain_text=plain_text)
+
+
 def send_email_async(to_addr, subject, body, is_html=False, plain_text=None):
     """Fire-and-forget email send in a background thread."""
     thread = threading.Thread(target=_send_email_detailed, args=(to_addr, subject, body, is_html, plain_text), daemon=True)
@@ -1154,6 +1274,30 @@ def signup():
             flash('Email already registered.', 'error')
             return redirect(url_for('signup'))
 
+        # When verification is disabled, create account immediately and skip email flow.
+        if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
+            stale_pending = PendingRegistration.query.filter(
+                or_(
+                    func.lower(PendingRegistration.username) == username.lower(),
+                    func.lower(PendingRegistration.email) == email.lower()
+                )
+            ).all()
+            for row in stale_pending:
+                db.session.delete(row)
+
+            user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password),
+                created_at=datetime.datetime.utcnow(),
+                email_verified=True
+            )
+            db.session.add(user)
+            db.session.commit()
+            session.pop('csrf_token', None)
+            flash('Registration successful. You can now log in.', 'success')
+            return redirect(url_for('login'))
+
         # Replace any existing pending row for this username/email with a fresh token.
         pending_rows = PendingRegistration.query.filter(
             or_(
@@ -1186,7 +1330,7 @@ def signup():
 
 Please verify your email to complete your SkillForge registration.
 
-Click the link below within 3 minutes:
+    Click the link below within {_email_verification_expiry_minutes()} minutes:
 {verification_link}
 
 If you did not request this account, you can ignore this email.
@@ -1211,7 +1355,7 @@ The SkillForge Team
         <p>Hello {username},</p>
         <p>Please verify your email to complete your SkillForge registration.</p>
         <p><a class=\"button\" href=\"{verification_link}\">Verify Email</a></p>
-        <p class=\"muted\">This link expires in 3 minutes.</p>
+        <p class=\"muted\">This link expires in {_email_verification_expiry_minutes()} minutes.</p>
         <p class=\"muted\">If you did not request this account, you can ignore this email.</p>
     </div>
 </body>
@@ -1223,7 +1367,7 @@ The SkillForge Team
         session.pop('csrf_token', None)
         if sent:
             flash('Registration started. Please verify your email to complete registration.', 'success')
-            flash('Please click the verification link in your email within 3 minutes to activate your account.', 'warning')
+            flash(f'Please click the verification link in your email within {_email_verification_expiry_minutes()} minutes to activate your account.', 'warning')
             return redirect(url_for('login'))
 
         flash(f'Registration is pending, but the verification email could not be sent ({error_msg}). Please try again after checking SMTP configuration.', 'error')
@@ -1240,15 +1384,15 @@ def admin_test_email():
     """Simple admin page to send a test email and report status inline."""
     msg = None
     status = ''
-    init_to = os.environ.get('SMTP_USER', '')
+    init_to = os.environ.get('EMAIL_FROM', '') or os.environ.get('SMTP_USER', '')
     if request.method == 'POST':
         to = request.form.get('to_email', '').strip()
         if not to:
             msg = 'Please provide an email address to send to.'
             status = 'warning'
         else:
-            subject = 'SkillForge SMTP Test'
-            body = f'This is a test message sent at {datetime.datetime.utcnow().isoformat()} UTC to verify SMTP configuration.'
+            subject = 'SkillForge Email Test'
+            body = f'This is a test message sent at {datetime.datetime.utcnow().isoformat()} UTC to verify email provider configuration.'
             try:
                 sent, err = _send_email_detailed(to, subject, body)
                 if sent:
@@ -4114,19 +4258,57 @@ def login():
                 ).first()
 
         if user is None and pending_account:
-            if _pending_registration_is_expired(pending_account):
+            if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
+                # In no-verification mode, pending rows should transparently become real users.
+                if _pending_registration_is_expired(pending_account):
+                    db.session.delete(pending_account)
+                    db.session.commit()
+                    flash('Your pending registration expired. Please sign up again.', 'warning')
+                    return redirect(url_for('signup'))
+
+                pending_ok, _pending_was_legacy = _password_matches(pending_account.password_hash, password)
+                if not pending_ok:
+                    flash('Incorrect password. Please try again.', 'error')
+                    return redirect(url_for('login'))
+
+                collision = User.query.filter(
+                    or_(
+                        func.lower(User.username) == pending_account.username.lower(),
+                        func.lower(User.email) == pending_account.email.lower()
+                    )
+                ).first()
+                if collision:
+                    db.session.delete(pending_account)
+                    db.session.commit()
+                    flash('Account already exists. Please log in.', 'info')
+                    return redirect(url_for('login'))
+
+                user = User(
+                    username=pending_account.username,
+                    email=pending_account.email,
+                    password_hash=pending_account.password_hash,
+                    created_at=datetime.datetime.utcnow(),
+                    email_verified=True
+                )
+                db.session.add(user)
+                db.session.delete(pending_account)
+                db.session.commit()
+                pending_account = None
+
+            if pending_account and _pending_registration_is_expired(pending_account):
                 db.session.delete(pending_account)
                 db.session.commit()
                 flash('Your verification link has expired. Please register again.', 'warning')
                 return redirect(url_for('signup'))
 
-            pending_ok, pending_was_legacy = _password_matches(pending_account.password_hash, password)
-            if not pending_ok:
-                flash('Incorrect password. Please try again.', 'error')
-                return redirect(url_for('login'))
+            if pending_account:
+                pending_ok, pending_was_legacy = _password_matches(pending_account.password_hash, password)
+                if not pending_ok:
+                    flash('Incorrect password. Please try again.', 'error')
+                    return redirect(url_for('login'))
 
-            flash('Your account is pending email verification. Please check your inbox and verify your email before logging in.', 'warning')
-            return redirect(url_for('login'))
+                flash('Your account is pending email verification. Please check your inbox and verify your email before logging in.', 'warning')
+                return redirect(url_for('login'))
 
         if user is None:
             flash('Account not found. Please sign up first.', 'error')
@@ -4175,9 +4357,9 @@ def verify_email(token):
         flash('Invalid or expired verification link.', 'error')
         return redirect(url_for('login'))
     
-    # Check if token is expired (3 minutes = 180 seconds)
+    # Check if token is expired
     if _pending_registration_is_expired(pending):
-        flash('Verification link has expired. Please register again.', 'error')
+        flash(f'Verification link has expired after {_email_verification_expiry_minutes()} minutes. Please register again.', 'error')
         db.session.delete(pending)
         db.session.commit()
         return redirect(url_for('signup'))
