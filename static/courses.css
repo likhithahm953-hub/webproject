@@ -686,6 +686,12 @@
 }
 
 @media (max-width: 768px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .courses-filters {
     flex-direction: column;
   }
@@ -697,6 +703,12 @@
   .search-sort-group {
     flex-direction: column;
     width: 100%;
+  }
+
+  .filter-tabs,
+  .search-sort-group {
+    min-width: 0;
+    max-width: 100%;
   }
   
   .search-box {

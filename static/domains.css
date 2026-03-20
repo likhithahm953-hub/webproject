@@ -435,6 +435,18 @@
 }
 
 @media (max-width: 768px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .domain-controls,
+  .search-box {
+    width: 100%;
+    min-width: 0;
+  }
+
   .domains-grid {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   }

@@ -1149,6 +1149,12 @@ html.light .theme-btn .fa-sun {
 }
 
 @media (max-width: 768px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .sidebar {
     width: var(--sidebar-collapsed);
   }
@@ -1197,6 +1203,15 @@ html.light .theme-btn .fa-sun {
   
   .notification-popup.show {
     right: 20px;
+  }
+
+  .container {
+    width: calc(100% - var(--sidebar-collapsed));
+    max-width: 100%;
+  }
+
+  .tabs {
+    -webkit-overflow-scrolling: touch;
   }
 }
 

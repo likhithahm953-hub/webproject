@@ -724,6 +724,12 @@
 }
 
 @media (max-width: 768px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .challenges-filters {
     flex-direction: column;
     align-items: stretch;
@@ -740,5 +746,12 @@
   
   .challenge-meta {
     grid-template-columns: 1fr;
+  }
+
+  .filter-controls,
+  .topic-filter,
+  .topic-select {
+    width: 100%;
+    min-width: 0;
   }
 }

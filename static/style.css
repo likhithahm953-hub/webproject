@@ -3,6 +3,17 @@ html {
     scroll-behavior: smooth;
 }
 
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
 /* Hero Section */
 .landing-page {
     margin: 0;
@@ -195,12 +206,14 @@ html {
     background: linear-gradient(180deg, rgba(10,10,10,1), rgba(20,20,20,1));
     min-height: 100vh;
     color: white;
+    padding: 16px;
 }
 .form-container {
+    width: min(100%, 440px);
     max-width: 440px;
-    margin: 80px auto;
+    margin: clamp(20px, 6vh, 80px) auto;
     background: rgba(255,255,255,0.03);
-    padding: 30px;
+    padding: clamp(18px, 4vw, 30px);
     border-radius: 12px;
     color: white;
     text-align: center;
@@ -335,5 +348,15 @@ html {
         width: 100%;
         max-width: 250px;
         padding: 12px 20px;
+    }
+
+    .flashes {
+        left: 12px;
+        right: 12px;
+    }
+
+    .flash {
+        width: 100%;
+        min-width: 0;
     }
 }
