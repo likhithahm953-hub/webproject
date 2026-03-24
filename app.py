@@ -115,6 +115,25 @@ def log_smtp_config():
 # Simple in-memory user store (for demo only)
 users = {}
 
+
+def ensure_domains_seeded_if_empty():
+    """Seed domains at runtime if the table exists but has no rows."""
+    try:
+        current_count = Domain.query.count()
+    except Exception as exc:
+        app.logger.warning(f'Unable to check domain count: {exc}')
+        return
+
+    if current_count > 0:
+        return
+
+    try:
+        from reset_domains import reset_domains
+        reset_domains()
+        app.logger.info('Domain auto-seed completed via reset_domains fallback.')
+    except Exception as exc:
+        app.logger.warning(f'Domain auto-seed failed: {exc}')
+
 # Database setup and avatar uploads
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
@@ -1614,6 +1633,7 @@ def api_courses():
 @app.route('/api/domains')
 def api_domains():
     """Get all learning domains"""
+    ensure_domains_seeded_if_empty()
     domains = Domain.query.all()
     results = []
     for domain in domains:
@@ -4505,6 +4525,7 @@ def domains():
     if not session.get('user'):
         flash('Please log in to choose a domain.', 'error')
         return redirect(url_for('login'))
+    ensure_domains_seeded_if_empty()
     user = User.query.filter_by(username=session.get('user')).first()
     domain_rows = Domain.query.order_by(Domain.id.asc()).all()
     initial_domains = [
