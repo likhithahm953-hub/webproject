@@ -591,30 +591,31 @@ with app.app_context():
     try:
         db.create_all()
 
-        # Lightweight migration for existing SQLite DBs
-        columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)"))]
-        if "email_verified" not in columns:
-            db.session.execute(text("ALTER TABLE user ADD COLUMN email_verified BOOLEAN DEFAULT 0"))
-        if "email_verification_token" not in columns:
-            db.session.execute(text("ALTER TABLE user ADD COLUMN email_verification_token VARCHAR(255)"))
-        db.session.execute(text("UPDATE user SET email_verified = 1 WHERE email_verified IS NULL"))
-        db.session.commit()
+        # Lightweight migration for existing SQLite DBs only.
+        if db.engine.url.get_backend_name() == 'sqlite':
+            columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)"))]
+            if "email_verified" not in columns:
+                db.session.execute(text("ALTER TABLE user ADD COLUMN email_verified BOOLEAN DEFAULT 0"))
+            if "email_verification_token" not in columns:
+                db.session.execute(text("ALTER TABLE user ADD COLUMN email_verification_token VARCHAR(255)"))
+            db.session.execute(text("UPDATE user SET email_verified = 1 WHERE email_verified IS NULL"))
+            db.session.commit()
 
-        domain_enrollment_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(domain_enrollment)"))]
-        if "assessed_level" not in domain_enrollment_columns:
-            db.session.execute(text("ALTER TABLE domain_enrollment ADD COLUMN assessed_level VARCHAR(30)"))
-        db.session.commit()
+            domain_enrollment_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(domain_enrollment)"))]
+            if "assessed_level" not in domain_enrollment_columns:
+                db.session.execute(text("ALTER TABLE domain_enrollment ADD COLUMN assessed_level VARCHAR(30)"))
+            db.session.commit()
 
-        course_link_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(course_link)"))]
-        if "duration_minutes" not in course_link_columns:
-            db.session.execute(text("ALTER TABLE course_link ADD COLUMN duration_minutes INTEGER"))
-        db.session.commit()
+            course_link_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(course_link)"))]
+            if "duration_minutes" not in course_link_columns:
+                db.session.execute(text("ALTER TABLE course_link ADD COLUMN duration_minutes INTEGER"))
+            db.session.commit()
 
-        quiz_attempt_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(domain_course_quiz_attempt)"))]
-        if "violation_count" not in quiz_attempt_columns:
-            db.session.execute(text("ALTER TABLE domain_course_quiz_attempt ADD COLUMN violation_count INTEGER DEFAULT 0"))
-            db.session.execute(text("UPDATE domain_course_quiz_attempt SET violation_count = 0 WHERE violation_count IS NULL"))
-        db.session.commit()
+            quiz_attempt_columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(domain_course_quiz_attempt)"))]
+            if "violation_count" not in quiz_attempt_columns:
+                db.session.execute(text("ALTER TABLE domain_course_quiz_attempt ADD COLUMN violation_count INTEGER DEFAULT 0"))
+                db.session.execute(text("UPDATE domain_course_quiz_attempt SET violation_count = 0 WHERE violation_count IS NULL"))
+            db.session.commit()
 
         for uname, info in list(users.items()):
             if not User.query.filter_by(username=uname).first():
@@ -652,7 +653,12 @@ with app.app_context():
         # Database might need to be recreated
         pass
     # Seed courses and lessons if empty
-    if Course.query.count() == 0:
+    try:
+        should_seed_courses = Course.query.count() == 0
+    except Exception:
+        should_seed_courses = False
+
+    if should_seed_courses:
         sample_courses = [
             {
                 'title': 'HTML & CSS Foundations',
@@ -767,10 +773,19 @@ with app.app_context():
                 )
                 db.session.add(lesson)
 
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            app.logger.warning(f"Course seed skipped due to DB error: {e}")
     
     # Seed domains if empty
-    if Domain.query.count() == 0:
+    try:
+        should_seed_domains = Domain.query.count() == 0
+    except Exception:
+        should_seed_domains = False
+
+    if should_seed_domains:
         domains_data = [
             # Top 100 High-Demand Tech Domains
             {'name': 'Machine Learning', 'description': 'AI/ML models, neural networks, deep learning, NLP, computer vision', 'icon': 'ðŸ§ ', 'keywords': 'tensorflow, pytorch, scikit-learn, nlp, cv, neural'},
@@ -893,7 +908,11 @@ with app.app_context():
             )
             db.session.add(domain)
         
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            app.logger.warning(f"Domain seed skipped due to DB error: {e}")
 
 # Clear the transient in-memory store to avoid accidental use
 users = {}
