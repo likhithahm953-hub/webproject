@@ -1421,77 +1421,83 @@ def signup():
 
 @app.route('/resend-verification', methods=['POST'])
 def resend_verification():
-    token = request.form.get('csrf_token')
-    if not token or token != session.get('csrf_token'):
-        flash('Form tampered or session expired. Please try again.', 'error')
-        return redirect(url_for('login'))
+    try:
+        token = request.form.get('csrf_token')
+        if not token or token != session.get('csrf_token'):
+            flash('Form tampered or session expired. Please try again.', 'error')
+            return redirect(url_for('login'))
 
-    if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
-        flash('Email verification is currently disabled. You can log in directly.', 'info')
-        return redirect(url_for('login'))
+        if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
+            flash('Email verification is currently disabled. You can log in directly.', 'info')
+            return redirect(url_for('login'))
 
-    identifier = request.form.get('identifier', '').strip()
-    if not identifier:
-        flash('Enter your username or email to resend verification.', 'warning')
-        return redirect(url_for('login'))
+        identifier = request.form.get('identifier', '').strip()
+        if not identifier:
+            flash('Enter your username or email to resend verification.', 'warning')
+            return redirect(url_for('login'))
 
-    normalized_identifier = identifier.lower()
-    identifier_looks_like_email = '@' in normalized_identifier
+        normalized_identifier = identifier.lower()
+        identifier_looks_like_email = '@' in normalized_identifier
 
-    if identifier_looks_like_email:
-        pending = PendingRegistration.query.filter(
-            func.lower(PendingRegistration.email) == normalized_identifier
-        ).first()
-        if not pending:
-            pending = PendingRegistration.query.filter(
-                PendingRegistration.username == identifier
-            ).first()
-        if not pending:
-            pending = PendingRegistration.query.filter(
-                func.lower(PendingRegistration.username) == normalized_identifier
-            ).first()
-    else:
-        pending = PendingRegistration.query.filter(
-            PendingRegistration.username == identifier
-        ).first()
-        if not pending:
+        if identifier_looks_like_email:
             pending = PendingRegistration.query.filter(
                 func.lower(PendingRegistration.email) == normalized_identifier
             ).first()
-        if not pending:
-            pending = PendingRegistration.query.filter(
-                func.lower(PendingRegistration.username) == normalized_identifier
-            ).first()
-
-    if not pending:
-        existing_user = User.query.filter(
-            or_(
-                func.lower(User.username) == normalized_identifier,
-                func.lower(User.email) == normalized_identifier
-            )
-        ).first()
-        if existing_user and existing_user.email_verified:
-            flash('This account is already verified. Please log in.', 'info')
+            if not pending:
+                pending = PendingRegistration.query.filter(
+                    PendingRegistration.username == identifier
+                ).first()
+            if not pending:
+                pending = PendingRegistration.query.filter(
+                    func.lower(PendingRegistration.username) == normalized_identifier
+                ).first()
         else:
-            flash('No pending verification found. Please sign up first.', 'warning')
-        return redirect(url_for('login'))
+            pending = PendingRegistration.query.filter(
+                PendingRegistration.username == identifier
+            ).first()
+            if not pending:
+                pending = PendingRegistration.query.filter(
+                    func.lower(PendingRegistration.email) == normalized_identifier
+                ).first()
+            if not pending:
+                pending = PendingRegistration.query.filter(
+                    func.lower(PendingRegistration.username) == normalized_identifier
+                ).first()
 
-    if _pending_registration_is_expired(pending):
-        db.session.delete(pending)
+        if not pending:
+            existing_user = User.query.filter(
+                or_(
+                    func.lower(User.username) == normalized_identifier,
+                    func.lower(User.email) == normalized_identifier
+                )
+            ).first()
+            if existing_user and existing_user.email_verified:
+                flash('This account is already verified. Please log in.', 'info')
+            else:
+                flash('No pending verification found. Please sign up first.', 'warning')
+            return redirect(url_for('login'))
+
+        if _pending_registration_is_expired(pending):
+            db.session.delete(pending)
+            db.session.commit()
+            flash('Your verification request expired. Please sign up again.', 'warning')
+            return redirect(url_for('signup'))
+
+        pending.token = secrets.token_urlsafe(32)
+        pending.token_created_at = datetime.datetime.utcnow()
         db.session.commit()
-        flash('Your verification request expired. Please sign up again.', 'warning')
-        return redirect(url_for('signup'))
 
-    pending.token = secrets.token_urlsafe(32)
-    pending.token_created_at = datetime.datetime.utcnow()
-    db.session.commit()
-
-    sent, error_msg = _send_verification_email_for_pending(pending)
-    if sent:
-        flash('A new verification email has been sent. Please check your inbox.', 'success')
-    else:
-        flash(f'Could not resend verification email ({error_msg}). Please try again later.', 'error')
-    return redirect(url_for('login'))
+        sent, error_msg = _send_verification_email_for_pending(pending)
+        if sent:
+            flash('A new verification email has been sent. Please check your inbox.', 'success')
+        else:
+            flash(f'Could not resend verification email ({error_msg}). Please try again later.', 'error')
+        return redirect(url_for('login'))
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception(f'Resend verification failed: {exc}')
+        flash('Unable to process resend verification right now. Please try again.', 'error')
+        return redirect(url_for('login'))
 
 
 @app.route('/admin/test-email', methods=['GET', 'POST'])
