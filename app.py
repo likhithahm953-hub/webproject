@@ -1254,6 +1254,60 @@ def send_email_async(to_addr, subject, body, is_html=False, plain_text=None):
     thread.start()
 
 
+def _send_verification_email_for_pending(pending):
+    """Send verification email for a pending registration row."""
+    base_url = app.config.get('SERVER_BASE_URL')
+    if base_url:
+        verification_link = base_url.rstrip('/') + url_for('verify_email', token=pending.token)
+    else:
+        verification_link = url_for('verify_email', token=pending.token, _external=True)
+
+    subject = 'Verify your email - SkillForge'
+    plain_text = f"""Hello {pending.username},
+
+Please verify your email to complete your SkillForge registration.
+
+    Click the link below within {_email_verification_expiry_minutes()} minutes:
+{verification_link}
+
+If you did not request this account, you can ignore this email.
+
+Best regards,
+The SkillForge Team
+"""
+    body = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset=\"UTF-8\">
+    <style>
+        body {{ font-family: Arial, sans-serif; background: #f8fafc; color: #0f172a; }}
+        .card {{ max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 12px; padding: 32px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); }}
+        .button {{ display: inline-block; padding: 12px 24px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; }}
+        .muted {{ color: #64748b; font-size: 14px; }}
+    </style>
+</head>
+<body>
+    <div class=\"card\">
+        <h2>Verify your email</h2>
+        <p>Hello {pending.username},</p>
+        <p>Please verify your email to complete your SkillForge registration.</p>
+        <p><a class=\"button\" href=\"{verification_link}\">Verify Email</a></p>
+        <p class=\"muted\">This link expires in {_email_verification_expiry_minutes()} minutes.</p>
+        <p class=\"muted\">If you did not request this account, you can ignore this email.</p>
+    </div>
+</body>
+</html>
+"""
+
+    return _send_email_detailed(
+        pending.email,
+        subject,
+        body,
+        is_html=True,
+        plain_text=plain_text
+    )
+
+
 
 
 @app.route('/')
@@ -1348,50 +1402,7 @@ def signup():
         db.session.add(pending)
         db.session.commit()
 
-        base_url = app.config.get('SERVER_BASE_URL')
-        if base_url:
-            verification_link = base_url.rstrip('/') + url_for('verify_email', token=verification_token)
-        else:
-            verification_link = url_for('verify_email', token=verification_token, _external=True)
-
-        subject = 'Verify your email - SkillForge'
-        plain_text = f"""Hello {username},
-
-Please verify your email to complete your SkillForge registration.
-
-    Click the link below within {_email_verification_expiry_minutes()} minutes:
-{verification_link}
-
-If you did not request this account, you can ignore this email.
-
-Best regards,
-The SkillForge Team
-"""
-        body = f"""<!DOCTYPE html>
-<html>
-<head>
-    <meta charset=\"UTF-8\">
-    <style>
-        body {{ font-family: Arial, sans-serif; background: #f8fafc; color: #0f172a; }}
-        .card {{ max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 12px; padding: 32px; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); }}
-        .button {{ display: inline-block; padding: 12px 24px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; }}
-        .muted {{ color: #64748b; font-size: 14px; }}
-    </style>
-</head>
-<body>
-    <div class=\"card\">
-        <h2>Verify your email</h2>
-        <p>Hello {username},</p>
-        <p>Please verify your email to complete your SkillForge registration.</p>
-        <p><a class=\"button\" href=\"{verification_link}\">Verify Email</a></p>
-        <p class=\"muted\">This link expires in {_email_verification_expiry_minutes()} minutes.</p>
-        <p class=\"muted\">If you did not request this account, you can ignore this email.</p>
-    </div>
-</body>
-</html>
-"""
-
-        sent, error_msg = _send_email_detailed(email, subject, body, is_html=True, plain_text=plain_text)
+        sent, error_msg = _send_verification_email_for_pending(pending)
 
         session.pop('csrf_token', None)
         if sent:
@@ -1406,6 +1417,81 @@ The SkillForge Team
     csrf_token = secrets.token_urlsafe(16)
     session['csrf_token'] = csrf_token
     return render_template('signup.html', csrf_token=csrf_token) 
+
+
+@app.route('/resend-verification', methods=['POST'])
+def resend_verification():
+    token = request.form.get('csrf_token')
+    if not token or token != session.get('csrf_token'):
+        flash('Form tampered or session expired. Please try again.', 'error')
+        return redirect(url_for('login'))
+
+    if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
+        flash('Email verification is currently disabled. You can log in directly.', 'info')
+        return redirect(url_for('login'))
+
+    identifier = request.form.get('identifier', '').strip()
+    if not identifier:
+        flash('Enter your username or email to resend verification.', 'warning')
+        return redirect(url_for('login'))
+
+    normalized_identifier = identifier.lower()
+    identifier_looks_like_email = '@' in normalized_identifier
+
+    if identifier_looks_like_email:
+        pending = PendingRegistration.query.filter(
+            func.lower(PendingRegistration.email) == normalized_identifier
+        ).first()
+        if not pending:
+            pending = PendingRegistration.query.filter(
+                PendingRegistration.username == identifier
+            ).first()
+        if not pending:
+            pending = PendingRegistration.query.filter(
+                func.lower(PendingRegistration.username) == normalized_identifier
+            ).first()
+    else:
+        pending = PendingRegistration.query.filter(
+            PendingRegistration.username == identifier
+        ).first()
+        if not pending:
+            pending = PendingRegistration.query.filter(
+                func.lower(PendingRegistration.email) == normalized_identifier
+            ).first()
+        if not pending:
+            pending = PendingRegistration.query.filter(
+                func.lower(PendingRegistration.username) == normalized_identifier
+            ).first()
+
+    if not pending:
+        existing_user = User.query.filter(
+            or_(
+                func.lower(User.username) == normalized_identifier,
+                func.lower(User.email) == normalized_identifier
+            )
+        ).first()
+        if existing_user and existing_user.email_verified:
+            flash('This account is already verified. Please log in.', 'info')
+        else:
+            flash('No pending verification found. Please sign up first.', 'warning')
+        return redirect(url_for('login'))
+
+    if _pending_registration_is_expired(pending):
+        db.session.delete(pending)
+        db.session.commit()
+        flash('Your verification request expired. Please sign up again.', 'warning')
+        return redirect(url_for('signup'))
+
+    pending.token = secrets.token_urlsafe(32)
+    pending.token_created_at = datetime.datetime.utcnow()
+    db.session.commit()
+
+    sent, error_msg = _send_verification_email_for_pending(pending)
+    if sent:
+        flash('A new verification email has been sent. Please check your inbox.', 'success')
+    else:
+        flash(f'Could not resend verification email ({error_msg}). Please try again later.', 'error')
+    return redirect(url_for('login'))
 
 
 @app.route('/admin/test-email', methods=['GET', 'POST'])
