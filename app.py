@@ -4,12 +4,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import re
 import os
 import secrets
-import socket
-import smtplib
-import ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header
+import subprocess
 from sqlalchemy import text, func, or_
 try:
     import certifi
@@ -19,7 +14,6 @@ import threading
 import datetime
 import json
 import time
-from urllib.parse import urlparse
 import urllib.request
 import urllib.error
 try:
@@ -47,16 +41,25 @@ app.config.setdefault('SMTP_HOST', os.environ.get('SMTP_HOST', ''))
 app.config.setdefault('SMTP_PORT', os.environ.get('SMTP_PORT', ''))
 app.config.setdefault('SMTP_USER', os.environ.get('SMTP_USER', ''))
 app.config.setdefault('SMTP_PASS', os.environ.get('SMTP_PASS', ''))
+app.config.setdefault('NODEMAILER_HOST', os.environ.get('NODEMAILER_HOST', ''))
+app.config.setdefault('NODEMAILER_PORT', os.environ.get('NODEMAILER_PORT', ''))
+app.config.setdefault('NODEMAILER_USER', os.environ.get('NODEMAILER_USER', ''))
+app.config.setdefault('NODEMAILER_PASS', os.environ.get('NODEMAILER_PASS', ''))
 app.config.setdefault('EMAIL_FROM', os.environ.get('EMAIL_FROM', ''))
 app.config.setdefault('EMAIL_PROVIDER', os.environ.get('EMAIL_PROVIDER', ''))
 app.config.setdefault('RESEND_API_KEY', os.environ.get('RESEND_API_KEY', ''))
 app.config.setdefault('RESEND_API_URL', os.environ.get('RESEND_API_URL', 'https://api.resend.com/emails'))
 app.config.setdefault('SERVER_BASE_URL', os.environ.get('SERVER_BASE_URL', ''))
 app.config.setdefault('SMTP_ALLOW_INSECURE', os.environ.get('SMTP_ALLOW_INSECURE', 'false'))
+app.config.setdefault('NODEMAILER_ALLOW_INSECURE', os.environ.get('NODEMAILER_ALLOW_INSECURE', 'false'))
 app.config.setdefault('EMAIL_VERIFICATION_EXPIRY_SECONDS', int(os.environ.get('EMAIL_VERIFICATION_EXPIRY_SECONDS', '900')))
 app.config.setdefault(
     'SMTP_USE_AUTH',
     str(os.environ.get('SMTP_USE_AUTH', 'true')).lower() in ('1', 'true', 'yes')
+)
+app.config.setdefault(
+    'NODEMAILER_USE_AUTH',
+    str(os.environ.get('NODEMAILER_USE_AUTH', 'true')).lower() in ('1', 'true', 'yes')
 )
 app.config.setdefault(
     'REQUIRE_EMAIL_VERIFICATION',
@@ -65,7 +68,7 @@ app.config.setdefault(
 # Force disable email verification for current deployment/demo mode.
 app.config['REQUIRE_EMAIL_VERIFICATION'] = False
 
-# Log SMTP configuration on startup (for debugging)
+# Log email provider configuration on startup (for debugging)
 @app.before_request
 def log_smtp_config():
     ensure_test_alert_dispatcher_started()
@@ -73,13 +76,21 @@ def log_smtp_config():
         email_provider = str(app.config.get('EMAIL_PROVIDER') or os.environ.get('EMAIL_PROVIDER') or '').strip().lower()
         resend_api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
         if not email_provider:
-            email_provider = 'resend' if resend_api_key else 'smtp'
+            email_provider = 'resend' if resend_api_key else 'nodemailer'
 
-        smtp_host = (app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST') or '').strip()
-        smtp_user = (app.config.get('SMTP_USER') or os.environ.get('SMTP_USER') or '').strip()
-        smtp_port = (str(app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '')).strip()
+        nodemailer_host = (app.config.get('NODEMAILER_HOST') or os.environ.get('NODEMAILER_HOST') or app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST') or '').strip()
+        nodemailer_user = (app.config.get('NODEMAILER_USER') or os.environ.get('NODEMAILER_USER') or app.config.get('SMTP_USER') or os.environ.get('SMTP_USER') or '').strip()
+        nodemailer_port = (str(app.config.get('NODEMAILER_PORT') or os.environ.get('NODEMAILER_PORT') or app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '')).strip()
         email_from = (app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or '').strip()
-        smtp_pass = (app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS') or '').strip()
+        nodemailer_pass = (app.config.get('NODEMAILER_PASS') or os.environ.get('NODEMAILER_PASS') or app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS') or '').strip()
+        nodemailer_use_auth_raw = app.config.get('NODEMAILER_USE_AUTH')
+        if nodemailer_use_auth_raw is None:
+            nodemailer_use_auth_raw = app.config.get('SMTP_USE_AUTH')
+        if isinstance(nodemailer_use_auth_raw, bool):
+            nodemailer_use_auth = nodemailer_use_auth_raw
+        else:
+            nodemailer_use_auth = str(nodemailer_use_auth_raw).lower() in ('1', 'true', 'yes')
+
         if email_provider == 'resend':
             if resend_api_key and email_from:
                 app.logger.info(f'Email provider configured: provider=resend, from={email_from}')
@@ -90,26 +101,32 @@ def log_smtp_config():
                 if not email_from:
                     missing.append('EMAIL_FROM')
                 app.logger.warning(f'Resend not fully configured - missing fields: {", ".join(missing)}')
-        elif all([smtp_host, smtp_user, smtp_port, email_from]):
-            app.logger.info(f'SMTP configured: host={smtp_host}, user={smtp_user}, port={smtp_port}, from={email_from}')
+        elif all([nodemailer_host, nodemailer_port, email_from]) and (not nodemailer_use_auth or (nodemailer_user and nodemailer_pass)):
+            app.logger.info(f'Email provider configured: provider=nodemailer, host={nodemailer_host}, user={nodemailer_user}, port={nodemailer_port}, from={email_from}')
         else:
             missing = []
-            if not smtp_host:
-                missing.append('SMTP_HOST')
-            if not smtp_user:
-                missing.append('SMTP_USER')
-            if not smtp_port:
-                missing.append('SMTP_PORT')
+            if not nodemailer_host:
+                missing.append('NODEMAILER_HOST')
+            if not nodemailer_port:
+                missing.append('NODEMAILER_PORT')
             if not email_from:
                 missing.append('EMAIL_FROM')
-            app.logger.warning(f'SMTP not fully configured - missing fields: {", ".join(missing)}')
+            if nodemailer_use_auth and not nodemailer_user:
+                missing.append('NODEMAILER_USER')
+            if nodemailer_use_auth and not nodemailer_pass:
+                missing.append('NODEMAILER_PASS')
+            app.logger.warning(f'NodeMailer not fully configured - missing fields: {", ".join(missing)}')
 
         # Surface email misconfiguration loudly when verification is required.
         if app.config.get('REQUIRE_EMAIL_VERIFICATION'):
             if email_provider == 'resend' and not all([resend_api_key, email_from]):
                 app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but Resend is incomplete.')
-            if email_provider != 'resend' and not all([smtp_host, smtp_user, smtp_port, email_from, smtp_pass]):
-                app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but SMTP is incomplete.')
+            if email_provider != 'resend':
+                nodemailer_ready = all([nodemailer_host, nodemailer_port, email_from]) and (
+                    (not nodemailer_use_auth) or (nodemailer_user and nodemailer_pass)
+                )
+                if not nodemailer_ready:
+                    app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but NodeMailer is incomplete.')
         app._smtp_logged = True
 
 # Simple in-memory user store (for demo only)
@@ -982,50 +999,6 @@ def _verify_user_password(user, candidate_password):
     return is_match, False
 
 
-def _smtp_connect_hosts(host, port):
-    """Return resolved SMTP targets, preferring IPv4 when available."""
-    try:
-        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
-    except socket.gaierror:
-        return [None]
-
-    targets = []
-    seen = set()
-    for family, _socktype, _proto, _canonname, sockaddr in infos:
-        connect_host = sockaddr[0]
-        key = (family, connect_host)
-        if key in seen:
-            continue
-        seen.add(key)
-        targets.append((family, connect_host))
-
-    targets.sort(key=lambda item: 0 if item[0] == socket.AF_INET else 1)
-    return [connect_host for _family, connect_host in targets] or [None]
-
-
-class _ResolvedSMTP(smtplib.SMTP):
-    def __init__(self, *args, connect_host=None, **kwargs):
-        self._connect_host = connect_host
-        super().__init__(*args, **kwargs)
-
-    def _get_socket(self, host, port, timeout):
-        if self.debuglevel > 0:
-            self._print_debug('connect:', (self._connect_host or host, port))
-        return socket.create_connection((self._connect_host or host, port), timeout, self.source_address)
-
-
-class _ResolvedSMTP_SSL(smtplib.SMTP_SSL):
-    def __init__(self, *args, connect_host=None, **kwargs):
-        self._connect_host = connect_host
-        super().__init__(*args, **kwargs)
-
-    def _get_socket(self, host, port, timeout):
-        if self.debuglevel > 0:
-            self._print_debug('connect:', (self._connect_host or host, port))
-        new_socket = socket.create_connection((self._connect_host or host, port), timeout, self.source_address)
-        return self.context.wrap_socket(new_socket, server_hostname=host)
-
-
 def _pending_registration_is_expired(pending):
     if not pending or not pending.token_created_at:
         return True
@@ -1060,7 +1033,7 @@ def _email_provider():
     if provider:
         return provider
     resend_api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
-    return 'resend' if resend_api_key else 'smtp'
+    return 'resend' if resend_api_key else 'nodemailer'
 
 
 def _send_email_via_resend(to_addr, subject, body, is_html=False, plain_text=None):
@@ -1135,43 +1108,39 @@ def _send_email_via_resend(to_addr, subject, body, is_html=False, plain_text=Non
         return False, error_msg
 
 
-def _send_email_via_smtp(to_addr, subject, body, is_html=False, plain_text=None):
-    """Sends email synchronously via SMTP. Returns (success, error_message)."""
-    host = app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST')
-    port_raw = app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '587'
-    user = app.config.get('SMTP_USER') or os.environ.get('SMTP_USER')
-    password = app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS')
+def _send_email_via_nodemailer(to_addr, subject, body, is_html=False, plain_text=None):
+    """Sends email synchronously via NodeMailer. Returns (success, error_message)."""
+    host = app.config.get('NODEMAILER_HOST') or os.environ.get('NODEMAILER_HOST') or app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST')
+    port_raw = app.config.get('NODEMAILER_PORT') or os.environ.get('NODEMAILER_PORT') or app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '587'
+    user = app.config.get('NODEMAILER_USER') or os.environ.get('NODEMAILER_USER') or app.config.get('SMTP_USER') or os.environ.get('SMTP_USER')
+    password = app.config.get('NODEMAILER_PASS') or os.environ.get('NODEMAILER_PASS') or app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS')
     from_addr = app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or user
-    allow_insecure_raw = app.config.get('SMTP_ALLOW_INSECURE') or os.environ.get('SMTP_ALLOW_INSECURE') or 'false'
-    use_auth_raw = app.config.get('SMTP_USE_AUTH')
+    allow_insecure_raw = app.config.get('NODEMAILER_ALLOW_INSECURE')
+    if allow_insecure_raw is None:
+        allow_insecure_raw = app.config.get('SMTP_ALLOW_INSECURE') or os.environ.get('SMTP_ALLOW_INSECURE') or 'false'
 
-    # Normalize config values so accidental spaces/newlines from env vars don't break SMTP.
+    use_auth_raw = app.config.get('NODEMAILER_USE_AUTH')
+    if use_auth_raw is None:
+        use_auth_raw = app.config.get('SMTP_USE_AUTH')
+
+    node_bin = str(app.config.get('NODE_BIN') or os.environ.get('NODE_BIN') or 'node').strip()
+    script_path = str(
+        app.config.get('NODEMAILER_SCRIPT')
+        or os.environ.get('NODEMAILER_SCRIPT')
+        or os.path.join(os.path.dirname(__file__), 'email_sender.js')
+    ).strip()
+
     host = str(host).strip() if host is not None else ''
     user = str(user).strip() if user is not None else ''
     password = str(password).strip() if password is not None else ''
     from_addr = str(from_addr).strip() if from_addr is not None else ''
 
-    # Accept common misconfigurations like "https://smtp.gmail.com" or "smtp.gmail.com:587".
-    if host and '://' in host:
-        parsed = urlparse(host)
-        host = (parsed.hostname or '').strip()
-    elif host and ':' in host and host.count(':') == 1:
-        maybe_host, maybe_port = host.rsplit(':', 1)
-        if maybe_port.isdigit():
-            host = maybe_host.strip()
-            if not (app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT')):
-                port_raw = maybe_port
-
     try:
         port = int(str(port_raw).strip())
     except Exception:
-        app.logger.warning(f'Invalid SMTP_PORT value: {port_raw!r}; falling back to 587')
+        app.logger.warning(f'Invalid NODEMAILER_PORT value: {port_raw!r}; falling back to 587')
         port = 587
 
-    # Gmail app passwords are often copied with spaces (xxxx xxxx xxxx xxxx).
-    # Normalize them to avoid authentication failures in hosted envs.
-    if password and host and 'gmail' in str(host).lower():
-        password = str(password).replace(' ', '')
     if isinstance(allow_insecure_raw, bool):
         allow_insecure = allow_insecure_raw
     else:
@@ -1184,80 +1153,93 @@ def _send_email_via_smtp(to_addr, subject, body, is_html=False, plain_text=None)
 
     missing = []
     if not host:
-        missing.append('SMTP_HOST')
+        missing.append('NODEMAILER_HOST')
     if not from_addr:
         missing.append('EMAIL_FROM')
     if use_auth and not user:
-        missing.append('SMTP_USER')
+        missing.append('NODEMAILER_USER')
     if use_auth and not password:
-        missing.append('SMTP_PASS')
+        missing.append('NODEMAILER_PASS')
 
     if missing:
-        msg = 'SMTP not fully configured. Missing: ' + ', '.join(missing)
+        msg = 'NodeMailer not fully configured. Missing: ' + ', '.join(missing)
         app.logger.warning(msg)
         print(f'WARN: {msg}')
         return False, msg
 
     print(f'Sending email to: {to_addr}')
     print(f'  Subject: {subject}')
-    print(f'  Via: {user}@{host}:{port} (SSL={port==465}, allow_insecure={allow_insecure})')
+    print(f'  Via: nodemailer ({host}:{port}, auth={use_auth}, allow_insecure={allow_insecure})')
 
-    # Create proper MIME email with UTF-8 encoding
-    msg = MIMEMultipart('alternative')
-    msg['From'] = f'SkillForge <{from_addr}>'
-    msg['To'] = to_addr
-    msg['Subject'] = Header(subject, 'utf-8')
-    
-    # Attach plain text first, then HTML (email clients prefer HTML if both present)
-    if plain_text:
-        part_plain = MIMEText(plain_text, 'plain', 'utf-8')
-        msg.attach(part_plain)
-    
-    if is_html:
-        part_html = MIMEText(body, 'html', 'utf-8')
-        msg.attach(part_html)
-    else:
-        part_plain = MIMEText(body, 'plain', 'utf-8')
-        msg.attach(part_plain)
-    
-    message = msg.as_string()
+    payload = {
+        'transport': {
+            'host': host,
+            'port': port,
+            'user': user,
+            'password': password,
+            'from': from_addr,
+            'allowInsecure': allow_insecure,
+            'useAuth': use_auth,
+        },
+        'message': {
+            'to': to_addr,
+            'subject': subject,
+            'html': body if is_html else '',
+            'text': plain_text or (body if not is_html else ''),
+        }
+    }
 
-    last_error = None
-    for connect_host in _smtp_connect_hosts(host, port):
+    try:
+        proc = subprocess.run(
+            [node_bin, script_path],
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
+        )
+    except FileNotFoundError:
+        error_msg = f'Node executable not found: {node_bin}'
+        app.logger.error(error_msg)
+        print(f'ERROR: {error_msg}')
+        return False, error_msg
+    except subprocess.TimeoutExpired:
+        error_msg = 'NodeMailer send timed out after 20 seconds.'
+        app.logger.error(error_msg)
+        print(f'ERROR: {error_msg}')
+        return False, error_msg
+    except Exception as exc:
+        error_msg = f'NodeMailer execution failed: {exc}'
+        app.logger.error(error_msg)
+        print(f'ERROR: {error_msg}')
+        return False, error_msg
+
+    stdout = (proc.stdout or '').strip()
+    stderr = (proc.stderr or '').strip()
+
+    if proc.returncode != 0:
+        error_msg = stderr or stdout or f'NodeMailer exited with code {proc.returncode}'
+        app.logger.error(f'Failed to send email to {to_addr}: {error_msg}')
+        print(f'ERROR: Failed to send email to {to_addr}: {error_msg}')
+        return False, error_msg
+
+    parsed = {}
+    if stdout:
         try:
-            if port == 465:
-                context = ssl.create_default_context(cafile=certifi.where()) if certifi else ssl.create_default_context()
-                if allow_insecure:
-                    context.check_hostname = False
-                    context.verify_mode = ssl.CERT_NONE
-                with _ResolvedSMTP_SSL(host=host, port=port, context=context, timeout=15, connect_host=connect_host) as server:
-                    server.ehlo()
-                    if use_auth:
-                        server.login(user, password)
-                    server.sendmail(from_addr, [to_addr], message)
-            else:
-                context = ssl.create_default_context(cafile=certifi.where()) if certifi else ssl.create_default_context()
-                if allow_insecure:
-                    context.check_hostname = False
-                    context.verify_mode = ssl.CERT_NONE
-                with _ResolvedSMTP(host=host, port=port, timeout=15, connect_host=connect_host) as server:
-                    server.ehlo()
-                    server.starttls(context=context)
-                    server.ehlo()
-                    if use_auth:
-                        server.login(user, password)
-                    server.sendmail(from_addr, [to_addr], message)
-            msg = f'Email sent to {to_addr}: {subject}'
-            app.logger.info(msg)
-            print(f'OK: {msg}')
-            return True, ''
-        except Exception as exc:
-            last_error = exc
+            parsed = json.loads(stdout)
+        except Exception:
+            parsed = {'ok': False, 'error': f'Invalid NodeMailer response: {stdout}'}
 
-    error_msg = f'Failed to send email to {to_addr}: {last_error}'
-    app.logger.error(error_msg)
-    print(f'ERROR: {error_msg}')
-    return False, str(last_error)
+    if parsed.get('ok'):
+        msg = f'Email sent to {to_addr}: {subject}'
+        app.logger.info(msg)
+        print(f'OK: {msg}')
+        return True, ''
+
+    error_msg = parsed.get('error') or stderr or 'Unknown NodeMailer failure.'
+    app.logger.error(f'Failed to send email to {to_addr}: {error_msg}')
+    print(f'ERROR: Failed to send email to {to_addr}: {error_msg}')
+    return False, error_msg
 
 
 def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None):
@@ -1265,7 +1247,7 @@ def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None)
     provider = _email_provider()
     if provider == 'resend':
         return _send_email_via_resend(to_addr, subject, body, is_html=is_html, plain_text=plain_text)
-    return _send_email_via_smtp(to_addr, subject, body, is_html=is_html, plain_text=plain_text)
+    return _send_email_via_nodemailer(to_addr, subject, body, is_html=is_html, plain_text=plain_text)
 
 
 def send_email_async(to_addr, subject, body, is_html=False, plain_text=None):
@@ -1419,7 +1401,7 @@ The SkillForge Team
             flash(f'Please click the verification link in your email within {_email_verification_expiry_minutes()} minutes to activate your account.', 'warning')
             return redirect(url_for('login'))
 
-        flash(f'Registration is pending, but the verification email could not be sent ({error_msg}). Please try again after checking SMTP configuration.', 'error')
+        flash(f'Registration is pending, but the verification email could not be sent ({error_msg}). Please try again after checking email provider configuration.', 'error')
         return redirect(url_for('signup'))
 
     # GET: set CSRF
@@ -1433,7 +1415,7 @@ def admin_test_email():
     """Simple admin page to send a test email and report status inline."""
     msg = None
     status = ''
-    init_to = os.environ.get('EMAIL_FROM', '') or os.environ.get('SMTP_USER', '')
+    init_to = os.environ.get('EMAIL_FROM', '') or os.environ.get('NODEMAILER_USER', '') or os.environ.get('SMTP_USER', '')
     if request.method == 'POST':
         to = request.form.get('to_email', '').strip()
         if not to:

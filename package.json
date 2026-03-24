@@ -1,0 +1,10 @@
+{
+  "name": "skillforge-email-node",
+  "private": true,
+  "version": "1.0.0",
+  "description": "NodeMailer helper for SkillForge email delivery",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "nodemailer": "^6.10.1"
+  }
+}

@@ -3,7 +3,7 @@ services:
     name: skillforge
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: npm install --omit=dev && pip install -r requirements.txt
     startCommand: gunicorn app:app
     healthCheckPath: /
     autoDeploy: true
@@ -27,24 +27,24 @@ services:
       - key: REQUIRE_EMAIL_VERIFICATION
         value: "false"
       - key: EMAIL_PROVIDER
-        value: "resend"
+        value: "nodemailer"
       - key: RESEND_API_KEY
         sync: false
-      - key: SMTP_USE_AUTH
+      - key: NODEMAILER_USE_AUTH
         value: "true"
-      - key: SMTP_HOST
+      - key: NODEMAILER_HOST
         sync: false
-      - key: SMTP_PORT
+      - key: NODEMAILER_PORT
         sync: false
-      - key: SMTP_USER
+      - key: NODEMAILER_USER
         sync: false
-      - key: SMTP_PASS
+      - key: NODEMAILER_PASS
         sync: false
       - key: EMAIL_FROM
         sync: false
       - key: SERVER_BASE_URL
         sync: false
-      - key: SMTP_ALLOW_INSECURE
+      - key: NODEMAILER_ALLOW_INSECURE
         value: "false"
       - key: EMAIL_VERIFICATION_EXPIRY_SECONDS
         value: "900"

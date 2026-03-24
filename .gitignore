@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 .venv/
+node_modules/
 
 # Local instance and secrets
 instance/config.py
