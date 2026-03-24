@@ -131,7 +131,18 @@ def allowed_file(filename):
 data_dir = os.environ.get('DATA_DIR', app.instance_path)
 os.makedirs(data_dir, exist_ok=True)
 db_path = os.environ.get('DATABASE_PATH', os.path.join(data_dir, 'database.db'))
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
+database_url = os.environ.get('DATABASE_URL', '').strip()
+if database_url:
+    # Render may expose legacy postgres:// URLs; SQLAlchemy expects postgresql://
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
+
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+}
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -4236,26 +4247,50 @@ def login():
             flash('Please provide both identifier and password.', 'error')
             return redirect(url_for('login'))
 
-        # Prefer exact username match first to avoid ambiguous case-insensitive collisions.
-        user = User.query.filter(User.username == identifier).first()
-        if not user:
+        identifier_looks_like_email = '@' in normalized_identifier
+
+        # If identifier looks like an email, prefer email lookup first.
+        # This avoids accidental username collisions causing false "incorrect password" errors.
+        if identifier_looks_like_email:
             user = User.query.filter(func.lower(User.email) == normalized_identifier).first()
-        if not user:
-            user = User.query.filter(func.lower(User.username) == normalized_identifier).first()
+            if not user:
+                user = User.query.filter(User.username == identifier).first()
+            if not user:
+                user = User.query.filter(func.lower(User.username) == normalized_identifier).first()
+        else:
+            # For non-email identifiers, keep username-first behavior.
+            user = User.query.filter(User.username == identifier).first()
+            if not user:
+                user = User.query.filter(func.lower(User.email) == normalized_identifier).first()
+            if not user:
+                user = User.query.filter(func.lower(User.username) == normalized_identifier).first()
 
         pending_account = None
         if not user:
-            pending_account = PendingRegistration.query.filter(
-                PendingRegistration.username == identifier
-            ).first()
-            if not pending_account:
+            if identifier_looks_like_email:
                 pending_account = PendingRegistration.query.filter(
                     func.lower(PendingRegistration.email) == normalized_identifier
                 ).first()
-            if not pending_account:
+                if not pending_account:
+                    pending_account = PendingRegistration.query.filter(
+                        PendingRegistration.username == identifier
+                    ).first()
+                if not pending_account:
+                    pending_account = PendingRegistration.query.filter(
+                        func.lower(PendingRegistration.username) == normalized_identifier
+                    ).first()
+            else:
                 pending_account = PendingRegistration.query.filter(
-                    func.lower(PendingRegistration.username) == normalized_identifier
+                    PendingRegistration.username == identifier
                 ).first()
+                if not pending_account:
+                    pending_account = PendingRegistration.query.filter(
+                        func.lower(PendingRegistration.email) == normalized_identifier
+                    ).first()
+                if not pending_account:
+                    pending_account = PendingRegistration.query.filter(
+                        func.lower(PendingRegistration.username) == normalized_identifier
+                    ).first()
 
         if user is None and pending_account:
             if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
