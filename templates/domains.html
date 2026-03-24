@@ -173,11 +173,43 @@
 
       <!-- Domains Grid -->
       <section class="courses-grid domains-grid" id="domains-grid">
-        <!-- Domains will be loaded here -->
+        {% if initial_domains %}
+          {% for domain in initial_domains %}
+          <div class="course-card domain-card" data-domain-id="{{ domain.id }}">
+            <div class="course-thumbnail">
+              <span class="domain-icon-large">{{ domain.icon }}</span>
+              <span class="course-badge">Domain</span>
+            </div>
+            <div class="course-content">
+              <div class="course-header">
+                <span class="course-category">Domain</span>
+                <h3 class="course-title">{{ domain.name }}</h3>
+              </div>
+              <p class="course-description">{{ domain.description }}</p>
+              <div class="course-footer domain-footer">
+                <div class="course-rating">
+                  <span class="stars">
+                    <i class="fa-solid fa-star"></i>
+                    <i class="fa-solid fa-star"></i>
+                    <i class="fa-solid fa-star"></i>
+                    <i class="fa-solid fa-star"></i>
+                    <i class="fa-solid fa-star-half-stroke"></i>
+                  </span>
+                  <span class="rating-value">4.8</span>
+                  <span class="rating-count">(120)</span>
+                </div>
+                <button class="course-action-btn btn-start">
+                  <i class="fa-solid fa-play"></i> Start
+                </button>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        {% endif %}
       </section>
 
       <!-- Empty State -->
-      <div class="empty-state" id="empty-state" style="display: none;">
+      <div class="empty-state" id="empty-state" style="display: {{ 'none' if initial_domains else 'flex' }};">
         <i class="fa-solid fa-inbox"></i>
         <h3>No domains found</h3>
         <p>Try adjusting your search</p>
@@ -276,7 +308,10 @@
   <!-- AI Chatbot Widget -->
   {% include 'ai_chatbot.html' %}
 
-  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
-  <script src="{{ url_for('static', filename='domains.js') }}"></script>
+  <script>
+    window.__INITIAL_DOMAINS__ = {{ initial_domains|default([], true)|tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='dashboard.js', v='20260324a') }}"></script>
+  <script src="{{ url_for('static', filename='domains.js', v='20260324a') }}"></script>
 </body>
 </html>

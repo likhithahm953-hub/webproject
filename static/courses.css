@@ -685,6 +685,12 @@
   margin-bottom: 8px;
 }
 
+@media (max-width: 992px) {
+  .courses-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   html,
   body {
@@ -717,5 +723,23 @@
   
   .courses-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .filter-tab {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .course-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .course-action-btn {
+    width: 100%;
   }
 }

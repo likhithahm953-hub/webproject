@@ -3,22 +3,36 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize all components
     initSidebar();
+    initMobileSidebar();
     initThemeToggle();
     initTabs();
     initNotifications();
     initProfileMenu();
     initNavigation();
-    renderDashboardContent();
-    animateCounters();
+
+    // Only run dashboard data rendering on dashboard-like layouts.
+    const hasDashboardPanels = !!document.querySelector('.tab-panels');
+    if (hasDashboardPanels) {
+        renderDashboardContent();
+        animateCounters();
+    }
 });
 
 // Sidebar Toggle
 function initSidebar() {
     const sidebar = document.getElementById('sidebar');
     const toggle = document.getElementById('sidebar-toggle');
+    const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+
+    if (!sidebar) return;
     
     if (toggle) {
         toggle.addEventListener('click', function() {
+            if (isMobile()) {
+                document.body.classList.toggle('sidebar-open');
+                return;
+            }
+
             sidebar.classList.toggle('collapsed');
             // Save state to localStorage
             localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
@@ -27,9 +41,63 @@ function initSidebar() {
     
     // Restore sidebar state
     const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-    if (isCollapsed) {
+    if (isCollapsed && !isMobile()) {
         sidebar.classList.add('collapsed');
     }
+
+    window.addEventListener('resize', function() {
+        if (!isMobile()) {
+            document.body.classList.remove('sidebar-open');
+            return;
+        }
+
+        sidebar.classList.remove('collapsed');
+    });
+}
+
+function initMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const topbar = document.querySelector('.topbar');
+    const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+
+    if (!sidebar || !topbar) return;
+
+    let mobileMenuBtn = document.getElementById('mobile-sidebar-toggle');
+    if (!mobileMenuBtn) {
+        mobileMenuBtn = document.createElement('button');
+        mobileMenuBtn.id = 'mobile-sidebar-toggle';
+        mobileMenuBtn.className = 'mobile-menu-btn';
+        mobileMenuBtn.type = 'button';
+        mobileMenuBtn.setAttribute('aria-label', 'Open menu');
+        mobileMenuBtn.innerHTML = '<i class="fa-solid fa-bars"></i>';
+        topbar.insertBefore(mobileMenuBtn, topbar.firstChild);
+    }
+
+    let backdrop = document.querySelector('.sidebar-backdrop');
+    if (!backdrop) {
+        backdrop = document.createElement('div');
+        backdrop.className = 'sidebar-backdrop';
+        document.body.appendChild(backdrop);
+    }
+
+    const closeMobileMenu = () => {
+        document.body.classList.remove('sidebar-open');
+    };
+
+    mobileMenuBtn.addEventListener('click', function() {
+        if (!isMobile()) return;
+        document.body.classList.toggle('sidebar-open');
+    });
+
+    backdrop.addEventListener('click', closeMobileMenu);
+
+    sidebar.querySelectorAll('.nav-item').forEach((item) => {
+        item.addEventListener('click', function() {
+            if (isMobile()) {
+                closeMobileMenu();
+            }
+        });
+    });
 }
 
 // Theme Toggle
@@ -128,6 +196,10 @@ function initNotifications() {
     
     // Close on outside click
     document.addEventListener('click', function(e) {
+        if (!notificationPopup || !notificationBtn) {
+            return;
+        }
+
         if (!notificationPopup.contains(e.target) && !notificationBtn.contains(e.target)) {
             notificationPopup.classList.remove('show');
         }
@@ -209,7 +281,7 @@ function animateCounters() {
 // Render Dashboard Content
 function renderDashboardContent() {
     loadDashboardStats();
-    renderDomains();
+    renderDashboardDomains();
     renderChallenges();
     renderRecommendations();
     renderActivity();
@@ -375,7 +447,7 @@ const mockData = {
 };
 
 // Render Domains - Fetch real data from API
-async function renderDomains() {
+async function renderDashboardDomains() {
     const grid = document.getElementById('courses-grid');
     if (!grid) return;
     

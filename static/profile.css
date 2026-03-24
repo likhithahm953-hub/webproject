@@ -1275,8 +1275,8 @@
 
   .main-content,
   .sidebar.collapsed + .main-content {
-    margin-left: var(--sidebar-collapsed);
-    width: calc(100% - var(--sidebar-collapsed));
+    margin-left: 0;
+    width: 100%;
     max-width: 100%;
   }
 
@@ -1386,6 +1386,30 @@
 
   .theme-selector {
     flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-container {
+    padding: 0 12px 16px;
+  }
+
+  .profile-header-simple {
+    padding: 18px 14px;
+  }
+
+  .profile-avatar-wrapper,
+  .profile-avatar-large-display {
+    width: 96px;
+    height: 96px;
+  }
+
+  .profile-avatar-large-display {
+    font-size: 2rem;
+  }
+
+  .profile-username {
+    font-size: 1.3rem;
   }
 }
 

@@ -261,6 +261,23 @@ html.light .theme-btn .fa-sun {
   box-shadow: 0 4px 12px var(--accent-glow);
 }
 
+.mobile-menu-btn {
+  display: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
 /* Main Container */
 .container {
   margin-left: var(--sidebar-width);
@@ -1156,31 +1173,89 @@ html.light .theme-btn .fa-sun {
   }
 
   .sidebar {
-    width: var(--sidebar-collapsed);
+    width: min(82vw, 300px);
+    max-width: 300px;
+    transform: translateX(-104%);
+    transition: transform 0.25s ease;
+    z-index: 130;
   }
   
   .sidebar .nav-item span {
-    opacity: 0;
-    width: 0;
+    opacity: 1;
+    width: auto;
   }
   
   .sidebar .brand h2 {
+    opacity: 1;
+    width: auto;
+  }
+
+  body.sidebar-open {
+    overflow: hidden;
+  }
+
+  body.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.5);
     opacity: 0;
-    width: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 120;
+    display: block;
+  }
+
+  body.sidebar-open .sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
   }
   
   .container {
-    margin-left: var(--sidebar-collapsed);
+    margin-left: 0 !important;
+    width: 100%;
+  }
+
+  .mobile-menu-btn {
+    display: inline-flex;
+    flex-shrink: 0;
   }
   
   .topbar {
+    padding: 16px;
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: 14px;
+  }
+
+  .hero-welcome {
+    width: 100%;
+  }
+
+  .top-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .top-actions > .btn-capsule {
+    flex: 1 1 100%;
+  }
+
+  .top-actions .profile-menu {
+    margin-left: auto;
   }
   
   .welcome-text {
     font-size: 1.4rem;
+  }
+
+  .dash-main {
+    padding: 20px 16px;
   }
   
   .overview-cards {
@@ -1203,11 +1278,6 @@ html.light .theme-btn .fa-sun {
   
   .notification-popup.show {
     right: 20px;
-  }
-
-  .container {
-    width: calc(100% - var(--sidebar-collapsed));
-    max-width: 100%;
   }
 
   .tabs {

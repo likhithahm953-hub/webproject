@@ -795,8 +795,8 @@
 
   .main-content,
   .sidebar.collapsed + .main-content {
-    margin-left: var(--sidebar-collapsed);
-    width: calc(100% - var(--sidebar-collapsed));
+    margin-left: 0;
+    width: 100%;
     max-width: 100%;
   }
 
@@ -815,5 +815,21 @@
   .integration-item {
     flex-direction: column;
     text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-container {
+    padding: 12px;
+  }
+
+  .settings-sidebar {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .settings-category {
+    min-width: 42px;
+    padding: 8px;
   }
 }

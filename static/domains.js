@@ -5,6 +5,17 @@ let selectedDomain = null;
 let selectedLevel = null;
 let currentQuizData = null;
 
+function hasServerRenderedDomains() {
+  return !!document.querySelector('#domains-grid .domain-card');
+}
+
+function getInitialDomainsFallback() {
+  if (!Array.isArray(window.__INITIAL_DOMAINS__)) {
+    return [];
+  }
+  return window.__INITIAL_DOMAINS__;
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
   await loadDomains();
@@ -14,8 +25,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadDomains() {
   try {
     const response = await fetch('/api/domains');
+    if (!response.ok) {
+      throw new Error(`Failed to fetch domains (HTTP ${response.status})`);
+    }
+
     const data = await response.json();
     allDomains = data.domains || [];
+
+    if (!allDomains.length) {
+      allDomains = getInitialDomainsFallback();
+    }
     
     // Update domain counts
     const countElement = document.getElementById('domains-count');
@@ -24,18 +43,37 @@ async function loadDomains() {
     if (totalCountElement) totalCountElement.textContent = allDomains.length;
     
     console.log(`Loaded ${allDomains.length} domains`);
+
+    if (!allDomains.length && hasServerRenderedDomains()) {
+      return;
+    }
+
     renderDomains(allDomains);
   } catch (error) {
     console.error('Error loading domains:', error);
-    allDomains = [];
+    allDomains = getInitialDomainsFallback();
+
+    if (!allDomains.length && hasServerRenderedDomains()) {
+      return;
+    }
+
+    renderDomains(allDomains);
   }
 }
 
 function renderDomains(domains) {
   const grid = document.getElementById('domains-grid');
   const emptyState = document.getElementById('empty-state');
+  const searchInput = document.getElementById('domain-search');
+  const searchTerm = (searchInput?.value || '').trim();
 
   if (!domains || domains.length === 0) {
+    // Keep already-rendered cards visible if no active search term.
+    if (!searchTerm && hasServerRenderedDomains()) {
+      emptyState.style.display = 'none';
+      return;
+    }
+
     grid.innerHTML = '';
     emptyState.style.display = 'flex';
     return;
@@ -85,15 +123,36 @@ function renderDomains(domains) {
 }
 
 function initializeEventListeners() {
+  const grid = document.getElementById('domains-grid');
+  if (grid) {
+    grid.addEventListener('click', (e) => {
+      const startBtn = e.target.closest('.btn-start');
+      if (!startBtn) return;
+
+      const card = e.target.closest('.domain-card');
+      if (!card) return;
+
+      const domainId = Number(card.getAttribute('data-domain-id'));
+      if (!allDomains.length) {
+        allDomains = getInitialDomainsFallback();
+      }
+
+      const domain = allDomains.find(d => Number(d.id) === domainId);
+      if (domain) {
+        openLevelModal(domain);
+      }
+    });
+  }
+
   // Search
   const searchInput = document.getElementById('domain-search');
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
       const term = e.target.value.toLowerCase();
       const filtered = allDomains.filter(d => 
-        d.name.toLowerCase().includes(term) ||
-        d.description.toLowerCase().includes(term) ||
-        d.keywords.toLowerCase().includes(term)
+        (d.name || '').toLowerCase().includes(term) ||
+        (d.description || '').toLowerCase().includes(term) ||
+        (d.keywords || '').toLowerCase().includes(term)
       );
       renderDomains(filtered);
     });

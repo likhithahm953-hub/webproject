@@ -4506,7 +4506,18 @@ def domains():
         flash('Please log in to choose a domain.', 'error')
         return redirect(url_for('login'))
     user = User.query.filter_by(username=session.get('user')).first()
-    return render_template('domains.html', user=user)
+    domain_rows = Domain.query.order_by(Domain.id.asc()).all()
+    initial_domains = [
+        {
+            'id': d.id,
+            'name': d.name,
+            'description': d.description,
+            'icon': d.icon,
+            'keywords': d.keywords or ''
+        }
+        for d in domain_rows
+    ]
+    return render_template('domains.html', user=user, initial_domains=initial_domains)
 
 
 @app.route('/domain/<int:domain_id>/learn')
