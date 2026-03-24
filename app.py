@@ -1395,8 +1395,8 @@ The SkillForge Team
 
         session.pop('csrf_token', None)
         if sent:
-            flash('Registration started. Please verify your email to complete registration.', 'success')
-            flash(f'Please click the verification link in your email within {_email_verification_expiry_minutes()} minutes to activate your account.', 'warning')
+            flash('Verification email sent successfully. Please check your inbox.', 'info')
+            flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
             return redirect(url_for('login'))
 
         flash(f'Registration is pending, but the verification email could not be sent ({error_msg}). Please try again after checking email provider configuration.', 'error')
