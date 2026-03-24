@@ -25,7 +25,7 @@ services:
       - key: QUIZ_PASS_THRESHOLD
         value: 70
       - key: REQUIRE_EMAIL_VERIFICATION
-        value: "false"
+        value: "true"
       - key: EMAIL_PROVIDER
         value: "nodemailer"
       - key: RESEND_API_KEY

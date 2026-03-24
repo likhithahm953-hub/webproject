@@ -65,8 +65,6 @@ app.config.setdefault(
     'REQUIRE_EMAIL_VERIFICATION',
     str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'false')).lower() in ('1', 'true', 'yes')
 )
-# Force disable email verification for current deployment/demo mode.
-app.config['REQUIRE_EMAIL_VERIFICATION'] = False
 
 # Log email provider configuration on startup (for debugging)
 @app.before_request
