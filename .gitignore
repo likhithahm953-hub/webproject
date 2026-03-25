@@ -8,6 +8,7 @@ node_modules/
 # Local instance and secrets
 instance/config.py
 instance/*.db
+instance/*.db-journal
 instance/*.sqlite
 instance/*.sqlite3
 
