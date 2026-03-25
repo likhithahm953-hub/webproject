@@ -16,6 +16,7 @@ import json
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 try:
     import google.generativeai as genai
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
@@ -1254,12 +1255,41 @@ def send_email_async(to_addr, subject, body, is_html=False, plain_text=None):
     thread.start()
 
 
+def _normalized_public_base_url(raw_base_url):
+    """Return a safe public base URL or an empty string when value is local/invalid."""
+    candidate = str(raw_base_url or '').strip()
+    if not candidate:
+        return ''
+
+    if '<' in candidate or '>' in candidate:
+        return ''
+
+    parsed = urllib.parse.urlparse(candidate)
+    if not parsed.scheme:
+        parsed = urllib.parse.urlparse('https://' + candidate)
+
+    host = (parsed.hostname or '').strip().lower()
+    if not host:
+        return ''
+
+    # Prevent generating unusable verification links in production emails.
+    if host in ('localhost', '127.0.0.1', '0.0.0.0') or host.endswith('.local'):
+        return ''
+
+    return parsed._replace(path='', params='', query='', fragment='').geturl().rstrip('/')
+
+
 def _send_verification_email_for_pending(pending):
     """Send verification email for a pending registration row."""
-    base_url = app.config.get('SERVER_BASE_URL')
-    if base_url:
-        verification_link = base_url.rstrip('/') + url_for('verify_email', token=pending.token)
+    configured_base_url = app.config.get('SERVER_BASE_URL')
+    safe_base_url = _normalized_public_base_url(configured_base_url)
+    if safe_base_url:
+        verification_link = safe_base_url + url_for('verify_email', token=pending.token)
     else:
+        if configured_base_url:
+            app.logger.warning(
+                f'Ignoring non-public SERVER_BASE_URL for verification link: {configured_base_url!r}'
+            )
         verification_link = url_for('verify_email', token=pending.token, _external=True)
 
     subject = 'Verify your email - SkillForge'
