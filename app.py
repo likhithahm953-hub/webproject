@@ -1010,6 +1010,16 @@ def _email_verification_expiry_minutes():
     return max(1, expiry_seconds // 60)
 
 
+def _ensure_pending_registration_table():
+    """Ensure pending registration table exists before verification queries."""
+    try:
+        PendingRegistration.__table__.create(bind=db.engine, checkfirst=True)
+        return True, ''
+    except Exception as exc:
+        app.logger.exception(f'PendingRegistration table ensure failed: {exc}')
+        return False, str(exc)
+
+
 def require_admin():
     if not session.get('user'):
         flash('Please log in to continue.', 'error')
@@ -1352,100 +1362,111 @@ def home():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        # CSRF check
-        token = request.form.get('csrf_token')
-        if not token or token != session.get('csrf_token'):
-            flash('Form tampered or session expired. Please try again.', 'error')
-            return redirect(url_for('signup'))
+        try:
+            # CSRF check
+            token = request.form.get('csrf_token')
+            if not token or token != session.get('csrf_token'):
+                flash('Form tampered or session expired. Please try again.', 'error')
+                return redirect(url_for('signup'))
 
-        username = request.form.get('username', '').strip()
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        confirm = request.form.get('confirm_password', '')
+            username = request.form.get('username', '').strip()
+            email = request.form.get('email', '').strip().lower()
+            password = request.form.get('password', '')
+            confirm = request.form.get('confirm_password', '')
 
-        if not username or not email or not password or not confirm:
-            flash('Please fill in all fields.', 'error')
-            return redirect(url_for('signup'))
+            if not username or not email or not password or not confirm:
+                flash('Please fill in all fields.', 'error')
+                return redirect(url_for('signup'))
 
-        if not is_valid_email(email):
-            flash('Email address is invalid. Use format name@example.com', 'error')
-            return redirect(url_for('signup'))
+            if not is_valid_email(email):
+                flash('Email address is invalid. Use format name@example.com', 'error')
+                return redirect(url_for('signup'))
 
-        existing_username_user = User.query.filter(
-            func.lower(User.username) == username.lower()
-        ).first()
-        if existing_username_user:
-            flash('Username already registered.', 'error')
-            return redirect(url_for('signup'))
+            existing_username_user = User.query.filter(
+                func.lower(User.username) == username.lower()
+            ).first()
+            if existing_username_user:
+                flash('Username already registered.', 'error')
+                return redirect(url_for('signup'))
 
-        if password != confirm:
-            flash('Passwords do not match.', 'error')
-            return redirect(url_for('signup'))
+            if password != confirm:
+                flash('Passwords do not match.', 'error')
+                return redirect(url_for('signup'))
 
-        ok, errors = is_strong_password(password)
-        if not ok:
-            flash('Password does not meet rules: ' + '; '.join(errors), 'error')
-            return redirect(url_for('signup'))
+            ok, errors = is_strong_password(password)
+            if not ok:
+                flash('Password does not meet rules: ' + '; '.join(errors), 'error')
+                return redirect(url_for('signup'))
 
-        if User.query.filter(func.lower(User.email) == email.lower()).first():
-            flash('Email already registered.', 'error')
-            return redirect(url_for('signup'))
+            if User.query.filter(func.lower(User.email) == email.lower()).first():
+                flash('Email already registered.', 'error')
+                return redirect(url_for('signup'))
 
-        # When verification is disabled, create account immediately and skip email flow.
-        if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
-            stale_pending = PendingRegistration.query.filter(
+            # When verification is disabled, create account immediately and skip email flow.
+            if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
+                stale_pending = PendingRegistration.query.filter(
+                    or_(
+                        func.lower(PendingRegistration.username) == username.lower(),
+                        func.lower(PendingRegistration.email) == email.lower()
+                    )
+                ).all()
+                for row in stale_pending:
+                    db.session.delete(row)
+
+                user = User(
+                    username=username,
+                    email=email,
+                    password_hash=generate_password_hash(password),
+                    created_at=datetime.datetime.utcnow(),
+                    email_verified=True
+                )
+                db.session.add(user)
+                db.session.commit()
+                session.pop('csrf_token', None)
+                flash('Registration successful. You can now log in.', 'success')
+                return redirect(url_for('login'))
+
+            table_ok, table_err = _ensure_pending_registration_table()
+            if not table_ok:
+                flash(f'Email verification setup error: {table_err}', 'error')
+                return redirect(url_for('signup'))
+
+            # Replace any existing pending row for this username/email with a fresh token.
+            pending_rows = PendingRegistration.query.filter(
                 or_(
                     func.lower(PendingRegistration.username) == username.lower(),
                     func.lower(PendingRegistration.email) == email.lower()
                 )
             ).all()
-            for row in stale_pending:
+            for row in pending_rows:
                 db.session.delete(row)
 
-            user = User(
+            verification_token = secrets.token_urlsafe(32)
+            pending = PendingRegistration(
                 username=username,
                 email=email,
                 password_hash=generate_password_hash(password),
-                created_at=datetime.datetime.utcnow(),
-                email_verified=True
+                token=verification_token,
+                token_created_at=datetime.datetime.utcnow()
             )
-            db.session.add(user)
+            db.session.add(pending)
             db.session.commit()
+
+            sent, error_msg = _send_verification_email_for_pending(pending)
+
             session.pop('csrf_token', None)
-            flash('Registration successful. You can now log in.', 'success')
-            return redirect(url_for('login'))
+            if sent:
+                flash('Verification email sent successfully. Please check your inbox.', 'info')
+                flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
+                return redirect(url_for('login'))
 
-        # Replace any existing pending row for this username/email with a fresh token.
-        pending_rows = PendingRegistration.query.filter(
-            or_(
-                func.lower(PendingRegistration.username) == username.lower(),
-                func.lower(PendingRegistration.email) == email.lower()
-            )
-        ).all()
-        for row in pending_rows:
-            db.session.delete(row)
-
-        verification_token = secrets.token_urlsafe(32)
-        pending = PendingRegistration(
-            username=username,
-            email=email,
-            password_hash=generate_password_hash(password),
-            token=verification_token,
-            token_created_at=datetime.datetime.utcnow()
-        )
-        db.session.add(pending)
-        db.session.commit()
-
-        sent, error_msg = _send_verification_email_for_pending(pending)
-
-        session.pop('csrf_token', None)
-        if sent:
-            flash('Verification email sent successfully. Please check your inbox.', 'info')
-            flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
-            return redirect(url_for('login'))
-
-        flash(f'Registration is pending, but the verification email could not be sent ({error_msg}). Please try again after checking email provider configuration.', 'error')
-        return redirect(url_for('signup'))
+            flash(f'Registration is pending, but the verification email could not be sent ({error_msg}). Please try again after checking email provider configuration.', 'error')
+            return redirect(url_for('signup'))
+        except Exception as exc:
+            db.session.rollback()
+            app.logger.exception(f'Signup failed: {exc}')
+            flash('Unable to process signup right now. Please try again.', 'error')
+            return redirect(url_for('signup'))
 
     # GET: set CSRF
     csrf_token = secrets.token_urlsafe(16)
@@ -1463,6 +1484,11 @@ def resend_verification():
 
         if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
             flash('Email verification is currently disabled. You can log in directly.', 'info')
+            return redirect(url_for('login'))
+
+        table_ok, table_err = _ensure_pending_registration_table()
+        if not table_ok:
+            flash(f'Email verification setup error: {table_err}', 'error')
             return redirect(url_for('login'))
 
         identifier = request.form.get('identifier', '').strip()
@@ -4384,6 +4410,8 @@ def login():
             flash('Form tampered or session expired. Please try again.', 'error')
             return redirect(url_for('login'))
 
+        _ensure_pending_registration_table()
+
         identifier = request.form.get('identifier', '').strip()
         normalized_identifier = identifier.lower()
         password = request.form.get('password', '')
@@ -4531,6 +4559,11 @@ def logout():
 @app.route('/verify-email/<token>')
 def verify_email(token):
     """Verify user email using the token sent in registration email."""
+    table_ok, table_err = _ensure_pending_registration_table()
+    if not table_ok:
+        flash(f'Email verification setup error: {table_err}', 'error')
+        return redirect(url_for('login'))
+
     pending = PendingRegistration.query.filter_by(token=token).first()
 
     if not pending:
