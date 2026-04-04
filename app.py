@@ -1277,7 +1277,7 @@ def _send_email_via_nodemailer(to_addr, subject, body, is_html=False, plain_text
             input=json.dumps(payload),
             capture_output=True,
             text=True,
-            timeout=45,
+            timeout=12,
             check=False,
         )
     except FileNotFoundError:
@@ -1286,7 +1286,7 @@ def _send_email_via_nodemailer(to_addr, subject, body, is_html=False, plain_text
         print(f'ERROR: {error_msg}')
         return False, error_msg
     except subprocess.TimeoutExpired:
-        error_msg = 'NodeMailer send timed out after 45 seconds.'
+        error_msg = 'NodeMailer send timed out after 12 seconds.'
         app.logger.error(error_msg)
         print(f'ERROR: {error_msg}')
         return False, error_msg

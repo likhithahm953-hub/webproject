@@ -127,8 +127,8 @@ async function main() {
         secure: plan.port === 465,
         auth: useAuth ? { user, pass: password } : undefined,
         connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 20000,
+        greetingTimeout: 5000,
+        socketTimeout: 8000,
         tls: {
           rejectUnauthorized: !allowInsecure,
           servername: host,
