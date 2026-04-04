@@ -1068,6 +1068,17 @@ def _email_verification_expiry_minutes():
     return max(1, expiry_seconds // 60)
 
 
+def _safe_flash(message, category='info', max_len=280):
+    """Flash helper that avoids oversized/session write failures causing 500s."""
+    try:
+        text_value = str(message or '').strip()
+        if len(text_value) > max_len:
+            text_value = text_value[:max_len] + '...'
+        flash(text_value, category)
+    except Exception as exc:
+        app.logger.warning(f'Skipping flash due to session/size issue: {exc}')
+
+
 def _ensure_pending_registration_table():
     """Ensure pending registration table exists before verification queries."""
     try:
@@ -1534,7 +1545,7 @@ def signup():
             # CSRF check
             token = request.form.get('csrf_token')
             if not token or token != session.get('csrf_token'):
-                flash('Form tampered or session expired. Please try again.', 'error')
+                _safe_flash('Form tampered or session expired. Please try again.', 'error')
                 return redirect(url_for('signup'))
 
             username = request.form.get('username', '').strip()
@@ -1543,31 +1554,31 @@ def signup():
             confirm = request.form.get('confirm_password', '')
 
             if not username or not email or not password or not confirm:
-                flash('Please fill in all fields.', 'error')
+                _safe_flash('Please fill in all fields.', 'error')
                 return redirect(url_for('signup'))
 
             if not is_valid_email(email):
-                flash('Email address is invalid. Use format name@example.com', 'error')
+                _safe_flash('Email address is invalid. Use format name@example.com', 'error')
                 return redirect(url_for('signup'))
 
             existing_username_user = User.query.filter(
                 func.lower(User.username) == username.lower()
             ).first()
             if existing_username_user:
-                flash('Username already registered.', 'error')
+                _safe_flash('Username already registered.', 'error')
                 return redirect(url_for('signup'))
 
             if password != confirm:
-                flash('Passwords do not match.', 'error')
+                _safe_flash('Passwords do not match.', 'error')
                 return redirect(url_for('signup'))
 
             ok, errors = is_strong_password(password)
             if not ok:
-                flash('Password does not meet rules: ' + '; '.join(errors), 'error')
+                _safe_flash('Password does not meet rules: ' + '; '.join(errors), 'error')
                 return redirect(url_for('signup'))
 
             if User.query.filter(func.lower(User.email) == email.lower()).first():
-                flash('Email already registered.', 'error')
+                _safe_flash('Email already registered.', 'error')
                 return redirect(url_for('signup'))
 
             # When verification is disabled, create account immediately and skip email flow.
@@ -1591,12 +1602,12 @@ def signup():
                 db.session.add(user)
                 db.session.commit()
                 session.pop('csrf_token', None)
-                flash('Registration successful. You can now log in.', 'success')
+                _safe_flash('Registration successful. You can now log in.', 'success')
                 return redirect(url_for('login'))
 
             table_ok, table_err = _ensure_pending_registration_table()
             if not table_ok:
-                flash(f'Email verification setup error: {table_err}', 'error')
+                _safe_flash(f'Email verification setup error: {table_err}', 'error')
                 return redirect(url_for('signup'))
 
             # Replace any existing pending row for this username/email with a fresh token.
@@ -1624,19 +1635,19 @@ def signup():
             ready, readiness_msg = _email_delivery_readiness()
             if not ready:
                 app.logger.error(f'Verification email not queued for {email}: {readiness_msg}')
-                flash(f'Registration is pending, but verification email could not be queued ({readiness_msg}). Please fix provider settings and use Resend Verification.', 'error')
+                _safe_flash(f'Registration is pending, but verification email could not be queued ({readiness_msg}). Please fix provider settings and use Resend Verification.', 'error')
             else:
                 sent, error_msg = _send_verification_email_for_pending(pending)
                 if sent:
-                    flash('Verification email sent successfully. Please check your inbox/spam.', 'info')
+                    _safe_flash('Verification email sent successfully. Please check your inbox/spam.', 'info')
                 else:
-                    flash(f'Registration is pending, but verification email could not be sent ({error_msg}). Please fix provider settings and use Resend Verification.', 'error')
-            flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
+                    _safe_flash(f'Registration is pending, but verification email could not be sent ({error_msg}). Please fix provider settings and use Resend Verification.', 'error')
+            _safe_flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
             return redirect(url_for('login'))
         except Exception as exc:
             db.session.rollback()
             app.logger.exception(f'Signup failed: {exc}')
-            flash('Unable to process signup right now. Please try again.', 'error')
+            _safe_flash('Unable to process signup right now. Please try again.', 'error')
             return redirect(url_for('signup'))
 
     # GET: set CSRF
@@ -1650,21 +1661,21 @@ def resend_verification():
     try:
         token = request.form.get('csrf_token')
         if not token or token != session.get('csrf_token'):
-            flash('Form tampered or session expired. Please try again.', 'error')
+            _safe_flash('Form tampered or session expired. Please try again.', 'error')
             return redirect(url_for('login'))
 
         if not app.config.get('REQUIRE_EMAIL_VERIFICATION', True):
-            flash('Email verification is currently disabled. You can log in directly.', 'info')
+            _safe_flash('Email verification is currently disabled. You can log in directly.', 'info')
             return redirect(url_for('login'))
 
         table_ok, table_err = _ensure_pending_registration_table()
         if not table_ok:
-            flash(f'Email verification setup error: {table_err}', 'error')
+            _safe_flash(f'Email verification setup error: {table_err}', 'error')
             return redirect(url_for('login'))
 
         identifier = request.form.get('identifier', '').strip()
         if not identifier:
-            flash('Enter your username or email to resend verification.', 'warning')
+            _safe_flash('Enter your username or email to resend verification.', 'warning')
             return redirect(url_for('login'))
 
         normalized_identifier = identifier.lower()
@@ -1703,15 +1714,15 @@ def resend_verification():
                 )
             ).first()
             if existing_user and existing_user.email_verified:
-                flash('This account is already verified. Please log in.', 'info')
+                _safe_flash('This account is already verified. Please log in.', 'info')
             else:
-                flash('No pending verification found. Please sign up first.', 'warning')
+                _safe_flash('No pending verification found. Please sign up first.', 'warning')
             return redirect(url_for('login'))
 
         if _pending_registration_is_expired(pending):
             db.session.delete(pending)
             db.session.commit()
-            flash('Your verification request expired. Please sign up again.', 'warning')
+            _safe_flash('Your verification request expired. Please sign up again.', 'warning')
             return redirect(url_for('signup'))
 
         pending.token = secrets.token_urlsafe(32)
@@ -1721,18 +1732,18 @@ def resend_verification():
         ready, readiness_msg = _email_delivery_readiness()
         if not ready:
             app.logger.error(f'Resend verification email not queued for {pending.email}: {readiness_msg}')
-            flash(f'Could not queue verification email ({readiness_msg}). Please fix provider settings.', 'error')
+            _safe_flash(f'Could not queue verification email ({readiness_msg}). Please fix provider settings.', 'error')
         else:
             sent, error_msg = _send_verification_email_for_pending(pending)
             if sent:
-                flash('A new verification email has been sent. Please check your inbox/spam.', 'success')
+                _safe_flash('A new verification email has been sent. Please check your inbox/spam.', 'success')
             else:
-                flash(f'Could not send verification email ({error_msg}). Please fix provider settings.', 'error')
+                _safe_flash(f'Could not send verification email ({error_msg}). Please fix provider settings.', 'error')
         return redirect(url_for('login'))
     except Exception as exc:
         db.session.rollback()
         app.logger.exception(f'Resend verification failed: {exc}')
-        flash('Unable to process resend verification right now. Please try again.', 'error')
+        _safe_flash('Unable to process resend verification right now. Please try again.', 'error')
         return redirect(url_for('login'))
 
 
