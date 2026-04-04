@@ -1622,12 +1622,15 @@ def signup():
 
             session.pop('csrf_token', None)
             ready, readiness_msg = _email_delivery_readiness()
-            if ready:
-                _send_verification_email_async_for_pending(pending)
-                flash('Registration is pending email verification. Verification email is queued now; please check inbox/spam in a minute.', 'info')
-            else:
+            if not ready:
                 app.logger.error(f'Verification email not queued for {email}: {readiness_msg}')
                 flash(f'Registration is pending, but verification email could not be queued ({readiness_msg}). Please fix provider settings and use Resend Verification.', 'error')
+            else:
+                sent, error_msg = _send_verification_email_for_pending(pending)
+                if sent:
+                    flash('Verification email sent successfully. Please check your inbox/spam.', 'info')
+                else:
+                    flash(f'Registration is pending, but verification email could not be sent ({error_msg}). Please fix provider settings and use Resend Verification.', 'error')
             flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
             return redirect(url_for('login'))
         except Exception as exc:
@@ -1716,12 +1719,15 @@ def resend_verification():
         db.session.commit()
 
         ready, readiness_msg = _email_delivery_readiness()
-        if ready:
-            _send_verification_email_async_for_pending(pending)
-            flash('A new verification email is queued. Please check your inbox/spam shortly.', 'success')
-        else:
+        if not ready:
             app.logger.error(f'Resend verification email not queued for {pending.email}: {readiness_msg}')
             flash(f'Could not queue verification email ({readiness_msg}). Please fix provider settings.', 'error')
+        else:
+            sent, error_msg = _send_verification_email_for_pending(pending)
+            if sent:
+                flash('A new verification email has been sent. Please check your inbox/spam.', 'success')
+            else:
+                flash(f'Could not send verification email ({error_msg}). Please fix provider settings.', 'error')
         return redirect(url_for('login'))
     except Exception as exc:
         db.session.rollback()
