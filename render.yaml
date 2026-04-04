@@ -33,15 +33,15 @@ services:
       - key: NODEMAILER_USE_AUTH
         value: "true"
       - key: NODEMAILER_HOST
-        sync: false
+        value: "smtp.gmail.com"
       - key: NODEMAILER_PORT
-        sync: false
+        value: "587"
       - key: NODEMAILER_USER
-        sync: false
+        value: "manjunathmanjunatht71@gmail.com"
       - key: NODEMAILER_PASS
         sync: false
       - key: EMAIL_FROM
-        sync: false
+        value: "manjunathmanjunatht71@gmail.com"
       - key: SERVER_BASE_URL
         sync: false
       - key: NODEMAILER_ALLOW_INSECURE
