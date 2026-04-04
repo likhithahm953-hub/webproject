@@ -660,8 +660,32 @@ with app.app_context():
     try:
         db.create_all()
 
+        backend_name = db.engine.url.get_backend_name()
+
+        # Lightweight migration for existing PostgreSQL DBs used on Render.
+        if backend_name in ('postgresql', 'postgres'):
+            postgres_migrations = [
+                'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE',
+                'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR(255)',
+                'ALTER TABLE "user" ADD COLUMN IF NOT EXISTS email_token_created_at TIMESTAMP',
+                'ALTER TABLE domain_enrollment ADD COLUMN IF NOT EXISTS assessed_level VARCHAR(30)',
+                'ALTER TABLE course_link ADD COLUMN IF NOT EXISTS duration_minutes INTEGER',
+                'ALTER TABLE domain_course_quiz_attempt ADD COLUMN IF NOT EXISTS violation_count INTEGER DEFAULT 0',
+            ]
+            for stmt in postgres_migrations:
+                try:
+                    db.session.execute(text(stmt))
+                except Exception as migration_exc:
+                    app.logger.warning(f'PostgreSQL migration step failed ({stmt}): {migration_exc}')
+            try:
+                db.session.execute(text('UPDATE "user" SET email_verified = TRUE WHERE email_verified IS NULL'))
+                db.session.execute(text('UPDATE domain_course_quiz_attempt SET violation_count = 0 WHERE violation_count IS NULL'))
+            except Exception as migration_exc:
+                app.logger.warning(f'PostgreSQL migration data backfill warning: {migration_exc}')
+            db.session.commit()
+
         # Lightweight migration for existing SQLite DBs only.
-        if db.engine.url.get_backend_name() == 'sqlite':
+        if backend_name == 'sqlite':
             columns = [row[1] for row in db.session.execute(text("PRAGMA table_info(user)"))]
             if "email_verified" not in columns:
                 db.session.execute(text("ALTER TABLE user ADD COLUMN email_verified BOOLEAN DEFAULT 0"))
