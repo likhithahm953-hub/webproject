@@ -1228,7 +1228,14 @@ def _send_email_via_nodemailer(to_addr, subject, body, is_html=False, plain_text
     stderr = (proc.stderr or '').strip()
 
     if proc.returncode != 0:
-        error_msg = stderr or stdout or f'NodeMailer exited with code {proc.returncode}'
+        parsed_error = ''
+        if stdout:
+            try:
+                failed_payload = json.loads(stdout)
+                parsed_error = str(failed_payload.get('error') or '').strip()
+            except Exception:
+                parsed_error = ''
+        error_msg = parsed_error or stderr or stdout or f'NodeMailer exited with code {proc.returncode}'
         app.logger.error(f'Failed to send email to {to_addr}: {error_msg}')
         print(f'ERROR: Failed to send email to {to_addr}: {error_msg}')
         return False, error_msg
