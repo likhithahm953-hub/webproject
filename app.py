@@ -64,7 +64,7 @@ app.config.setdefault(
 )
 app.config.setdefault(
     'REQUIRE_EMAIL_VERIFICATION',
-    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'false')).strip().lower() in ('1', 'true', 'yes', 'on')
+    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'true')).strip().lower() in ('1', 'true', 'yes', 'on')
 )
 
 # Log email provider configuration on startup (for debugging)
