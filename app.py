@@ -1129,12 +1129,13 @@ def _send_email_via_resend(to_addr, subject, body, is_html=False, plain_text=Non
     api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
     api_url = str(app.config.get('RESEND_API_URL') or os.environ.get('RESEND_API_URL') or 'https://api.resend.com/emails').strip()
     from_addr = str(app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or '').strip()
+    if not from_addr:
+        from_addr = 'onboarding@resend.dev'
+        app.logger.warning('EMAIL_FROM not set; using Resend default sender onboarding@resend.dev')
 
     missing = []
     if not api_key:
         missing.append('RESEND_API_KEY')
-    if not from_addr:
-        missing.append('EMAIL_FROM')
     if missing:
         msg = 'Resend not fully configured. Missing: ' + ', '.join(missing)
         app.logger.warning(msg)
@@ -1480,7 +1481,7 @@ def _email_delivery_readiness():
         has_port = False
 
     nodemailer_ready = bool(host and has_port and email_from and ((not use_auth) or (user and password)))
-    resend_ready = bool(resend_api_key and email_from)
+    resend_ready = bool(resend_api_key)
 
     if nodemailer_ready or resend_ready:
         return True, ''
