@@ -1444,6 +1444,50 @@ The SkillForge Team
     )
 
 
+def _email_delivery_readiness():
+    """Check whether at least one email provider path is configured for delivery."""
+    email_from = str(app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or '').strip()
+    resend_api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
+
+    host = str(app.config.get('NODEMAILER_HOST') or os.environ.get('NODEMAILER_HOST') or app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST') or '').strip()
+    port_raw = app.config.get('NODEMAILER_PORT') or os.environ.get('NODEMAILER_PORT') or app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or ''
+    user = str(app.config.get('NODEMAILER_USER') or os.environ.get('NODEMAILER_USER') or app.config.get('SMTP_USER') or os.environ.get('SMTP_USER') or '').strip()
+    password = str(app.config.get('NODEMAILER_PASS') or os.environ.get('NODEMAILER_PASS') or app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS') or '').strip()
+
+    use_auth_raw = app.config.get('NODEMAILER_USE_AUTH')
+    if use_auth_raw is None:
+        use_auth_raw = app.config.get('SMTP_USE_AUTH')
+    use_auth = _env_bool(use_auth_raw, default=True)
+
+    try:
+        int(str(port_raw).strip())
+        has_port = True
+    except Exception:
+        has_port = False
+
+    nodemailer_ready = bool(host and has_port and email_from and ((not use_auth) or (user and password)))
+    resend_ready = bool(resend_api_key and email_from)
+
+    if nodemailer_ready or resend_ready:
+        return True, ''
+
+    missing = []
+    if not email_from:
+        missing.append('EMAIL_FROM')
+    if not host:
+        missing.append('NODEMAILER_HOST')
+    if not has_port:
+        missing.append('NODEMAILER_PORT')
+    if use_auth and not user:
+        missing.append('NODEMAILER_USER')
+    if use_auth and not password:
+        missing.append('NODEMAILER_PASS')
+    if not resend_api_key:
+        missing.append('RESEND_API_KEY(optional fallback)')
+
+    return False, 'Email provider not configured. Missing: ' + ', '.join(missing)
+
+
 def _send_verification_email_async_for_pending(pending):
     """Fire-and-forget verification email send so signup requests do not time out."""
     pending_username = str(getattr(pending, 'username', '') or '')
@@ -1577,8 +1621,13 @@ def signup():
             db.session.commit()
 
             session.pop('csrf_token', None)
-            _send_verification_email_async_for_pending(pending)
-            flash('Registration is pending email verification. Verification email is being sent now; please check inbox/spam in a minute.', 'info')
+            ready, readiness_msg = _email_delivery_readiness()
+            if ready:
+                _send_verification_email_async_for_pending(pending)
+                flash('Registration is pending email verification. Verification email is queued now; please check inbox/spam in a minute.', 'info')
+            else:
+                app.logger.error(f'Verification email not queued for {email}: {readiness_msg}')
+                flash(f'Registration is pending, but verification email could not be queued ({readiness_msg}). Please fix provider settings and use Resend Verification.', 'error')
             flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
             return redirect(url_for('login'))
         except Exception as exc:
@@ -1666,8 +1715,13 @@ def resend_verification():
         pending.token_created_at = datetime.datetime.utcnow()
         db.session.commit()
 
-        _send_verification_email_async_for_pending(pending)
-        flash('A new verification email is being sent. Please check your inbox/spam shortly.', 'success')
+        ready, readiness_msg = _email_delivery_readiness()
+        if ready:
+            _send_verification_email_async_for_pending(pending)
+            flash('A new verification email is queued. Please check your inbox/spam shortly.', 'success')
+        else:
+            app.logger.error(f'Resend verification email not queued for {pending.email}: {readiness_msg}')
+            flash(f'Could not queue verification email ({readiness_msg}). Please fix provider settings.', 'error')
         return redirect(url_for('login'))
     except Exception as exc:
         db.session.rollback()
