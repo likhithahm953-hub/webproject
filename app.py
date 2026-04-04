@@ -56,15 +56,15 @@ app.config.setdefault('NODEMAILER_ALLOW_INSECURE', os.environ.get('NODEMAILER_AL
 app.config.setdefault('EMAIL_VERIFICATION_EXPIRY_SECONDS', int(os.environ.get('EMAIL_VERIFICATION_EXPIRY_SECONDS', '900')))
 app.config.setdefault(
     'SMTP_USE_AUTH',
-    str(os.environ.get('SMTP_USE_AUTH', 'true')).lower() in ('1', 'true', 'yes')
+    str(os.environ.get('SMTP_USE_AUTH', 'true')).strip().lower() in ('1', 'true', 'yes', 'on')
 )
 app.config.setdefault(
     'NODEMAILER_USE_AUTH',
-    str(os.environ.get('NODEMAILER_USE_AUTH', 'true')).lower() in ('1', 'true', 'yes')
+    str(os.environ.get('NODEMAILER_USE_AUTH', 'true')).strip().lower() in ('1', 'true', 'yes', 'on')
 )
 app.config.setdefault(
     'REQUIRE_EMAIL_VERIFICATION',
-    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'false')).lower() in ('1', 'true', 'yes')
+    str(os.environ.get('REQUIRE_EMAIL_VERIFICATION', 'false')).strip().lower() in ('1', 'true', 'yes', 'on')
 )
 
 # Log email provider configuration on startup (for debugging)
@@ -88,7 +88,7 @@ def log_smtp_config():
         if isinstance(nodemailer_use_auth_raw, bool):
             nodemailer_use_auth = nodemailer_use_auth_raw
         else:
-            nodemailer_use_auth = str(nodemailer_use_auth_raw).lower() in ('1', 'true', 'yes')
+            nodemailer_use_auth = str(nodemailer_use_auth_raw).strip().lower() in ('1', 'true', 'yes', 'on')
 
         if email_provider == 'resend':
             if resend_api_key and email_from:
@@ -1035,6 +1035,14 @@ def _email_provider():
     return 'resend' if resend_api_key else 'nodemailer'
 
 
+def _env_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
 def _send_email_via_resend(to_addr, subject, body, is_html=False, plain_text=None):
     api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
     api_url = str(app.config.get('RESEND_API_URL') or os.environ.get('RESEND_API_URL') or 'https://api.resend.com/emails').strip()
@@ -1140,15 +1148,8 @@ def _send_email_via_nodemailer(to_addr, subject, body, is_html=False, plain_text
         app.logger.warning(f'Invalid NODEMAILER_PORT value: {port_raw!r}; falling back to 587')
         port = 587
 
-    if isinstance(allow_insecure_raw, bool):
-        allow_insecure = allow_insecure_raw
-    else:
-        allow_insecure = str(allow_insecure_raw).lower() in ('1', 'true', 'yes')
-
-    if isinstance(use_auth_raw, bool):
-        use_auth = use_auth_raw
-    else:
-        use_auth = str(use_auth_raw).lower() in ('1', 'true', 'yes')
+    allow_insecure = _env_bool(allow_insecure_raw, default=False)
+    use_auth = _env_bool(use_auth_raw, default=True)
 
     missing = []
     if not host:
@@ -1194,7 +1195,7 @@ def _send_email_via_nodemailer(to_addr, subject, body, is_html=False, plain_text
             input=json.dumps(payload),
             capture_output=True,
             text=True,
-            timeout=20,
+            timeout=30,
             check=False,
         )
     except FileNotFoundError:
@@ -1203,7 +1204,7 @@ def _send_email_via_nodemailer(to_addr, subject, body, is_html=False, plain_text
         print(f'ERROR: {error_msg}')
         return False, error_msg
     except subprocess.TimeoutExpired:
-        error_msg = 'NodeMailer send timed out after 20 seconds.'
+        error_msg = 'NodeMailer send timed out after 30 seconds.'
         app.logger.error(error_msg)
         print(f'ERROR: {error_msg}')
         return False, error_msg
@@ -1221,6 +1222,9 @@ def _send_email_via_nodemailer(to_addr, subject, body, is_html=False, plain_text
         app.logger.error(f'Failed to send email to {to_addr}: {error_msg}')
         print(f'ERROR: Failed to send email to {to_addr}: {error_msg}')
         return False, error_msg
+
+    if stderr:
+        app.logger.warning(f'NodeMailer stderr for {to_addr}: {stderr}')
 
     parsed = {}
     if stdout:
