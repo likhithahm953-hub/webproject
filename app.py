@@ -136,10 +136,7 @@ def log_smtp_config():
 @app.errorhandler(500)
 def handle_internal_server_error(exc):
     app.logger.exception(f'Unhandled Internal Server Error: {exc}')
-    try:
-        db.session.rollback()
-    except Exception:
-        pass
+    _safe_rollback('500 handler')
     wants_json = request.path.startswith('/api/') or request.is_json
     if wants_json:
         return jsonify({'error': 'Internal server error'}), 500
@@ -152,10 +149,7 @@ def handle_unexpected_exception(exc):
         return exc
 
     app.logger.exception(f'Unhandled exception: {exc}')
-    try:
-        db.session.rollback()
-    except Exception:
-        pass
+    _safe_rollback('global exception handler')
 
     wants_json = request.path.startswith('/api/') or request.is_json
     if wants_json:
@@ -1079,6 +1073,15 @@ def _safe_flash(message, category='info', max_len=280):
         app.logger.warning(f'Skipping flash due to session/size issue: {exc}')
 
 
+def _safe_rollback(context=''):
+    """Rollback helper that never raises, avoiding cascading 500 errors."""
+    try:
+        db.session.rollback()
+    except Exception as exc:
+        where = f' ({context})' if context else ''
+        app.logger.warning(f'Rollback skipped due to database/session error{where}: {exc}')
+
+
 def _ensure_pending_registration_table():
     """Ensure pending registration table exists before verification queries."""
     try:
@@ -1645,7 +1648,7 @@ def signup():
             _safe_flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
             return redirect(url_for('login'))
         except Exception as exc:
-            db.session.rollback()
+            _safe_rollback('signup exception')
             app.logger.exception(f'Signup failed: {exc}')
             _safe_flash('Unable to process signup right now. Please try again.', 'error')
             return redirect(url_for('signup'))
@@ -1741,7 +1744,7 @@ def resend_verification():
                 _safe_flash(f'Could not send verification email ({error_msg}). Please fix provider settings.', 'error')
         return redirect(url_for('login'))
     except Exception as exc:
-        db.session.rollback()
+        _safe_rollback('resend verification exception')
         app.logger.exception(f'Resend verification failed: {exc}')
         _safe_flash('Unable to process resend verification right now. Please try again.', 'error')
         return redirect(url_for('login'))
