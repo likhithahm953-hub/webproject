@@ -77,12 +77,13 @@ async function main() {
       port,
       secure: port === 465,
       auth: useAuth ? { user, pass: password } : undefined,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
       tls: {
         rejectUnauthorized: !allowInsecure,
       },
     });
-
-    await transporter.verify();
 
     const to = String(message.to || '').trim();
     const subject = String(message.subject || '');
@@ -94,7 +95,7 @@ async function main() {
     }
 
     let info = null;
-    const maxAttempts = 3;
+    const maxAttempts = 2;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
