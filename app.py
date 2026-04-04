@@ -1,6 +1,7 @@
 ﻿from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.exceptions import HTTPException
 import re
 import os
 import secrets
@@ -139,8 +140,27 @@ def handle_internal_server_error(exc):
         db.session.rollback()
     except Exception:
         pass
-    flash('Temporary server issue. Please try again in a few seconds.', 'error')
-    return redirect(url_for('login'))
+    wants_json = request.path.startswith('/api/') or request.is_json
+    if wants_json:
+        return jsonify({'error': 'Internal server error'}), 500
+    return 'Internal Server Error. Please try again shortly.', 500
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(exc):
+    if isinstance(exc, HTTPException):
+        return exc
+
+    app.logger.exception(f'Unhandled exception: {exc}')
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+
+    wants_json = request.path.startswith('/api/') or request.is_json
+    if wants_json:
+        return jsonify({'error': 'Internal server error'}), 500
+    return 'Internal Server Error. Please try again shortly.', 500
 
 # Simple in-memory user store (for demo only)
 users = {}
