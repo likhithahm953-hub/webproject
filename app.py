@@ -1267,7 +1267,34 @@ def _send_email_detailed(to_addr, subject, body, is_html=False, plain_text=None)
     provider = _email_provider()
     if provider == 'resend':
         return _send_email_via_resend(to_addr, subject, body, is_html=is_html, plain_text=plain_text)
-    return _send_email_via_nodemailer(to_addr, subject, body, is_html=is_html, plain_text=plain_text)
+
+    nodemailer_ok, nodemailer_err = _send_email_via_nodemailer(
+        to_addr,
+        subject,
+        body,
+        is_html=is_html,
+        plain_text=plain_text,
+    )
+    if nodemailer_ok:
+        return True, ''
+
+    # Production fallback: if NodeMailer fails and Resend is configured, try Resend automatically.
+    resend_api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
+    if resend_api_key:
+        resend_ok, resend_err = _send_email_via_resend(
+            to_addr,
+            subject,
+            body,
+            is_html=is_html,
+            plain_text=plain_text,
+        )
+        if resend_ok:
+            app.logger.warning('NodeMailer failed but Resend fallback succeeded.')
+            return True, ''
+        combined_error = f'NodeMailer failed: {nodemailer_err}; Resend fallback failed: {resend_err}'
+        return False, combined_error
+
+    return False, nodemailer_err
 
 
 def send_email_async(to_addr, subject, body, is_html=False, plain_text=None):
