@@ -70,63 +70,77 @@ app.config.setdefault(
 # Log email provider configuration on startup (for debugging)
 @app.before_request
 def log_smtp_config():
-    ensure_test_alert_dispatcher_started()
-    if not hasattr(app, '_smtp_logged'):
-        email_provider = str(app.config.get('EMAIL_PROVIDER') or os.environ.get('EMAIL_PROVIDER') or '').strip().lower()
-        resend_api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
-        if not email_provider:
-            email_provider = 'resend' if resend_api_key else 'nodemailer'
+    try:
+        ensure_test_alert_dispatcher_started()
+        if not hasattr(app, '_smtp_logged'):
+            email_provider = str(app.config.get('EMAIL_PROVIDER') or os.environ.get('EMAIL_PROVIDER') or '').strip().lower()
+            resend_api_key = (app.config.get('RESEND_API_KEY') or os.environ.get('RESEND_API_KEY') or '').strip()
+            if not email_provider:
+                email_provider = 'resend' if resend_api_key else 'nodemailer'
 
-        nodemailer_host = (app.config.get('NODEMAILER_HOST') or os.environ.get('NODEMAILER_HOST') or app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST') or '').strip()
-        nodemailer_user = (app.config.get('NODEMAILER_USER') or os.environ.get('NODEMAILER_USER') or app.config.get('SMTP_USER') or os.environ.get('SMTP_USER') or '').strip()
-        nodemailer_port = (str(app.config.get('NODEMAILER_PORT') or os.environ.get('NODEMAILER_PORT') or app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '')).strip()
-        email_from = (app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or '').strip()
-        nodemailer_pass = (app.config.get('NODEMAILER_PASS') or os.environ.get('NODEMAILER_PASS') or app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS') or '').strip()
-        nodemailer_use_auth_raw = app.config.get('NODEMAILER_USE_AUTH')
-        if nodemailer_use_auth_raw is None:
-            nodemailer_use_auth_raw = app.config.get('SMTP_USE_AUTH')
-        if isinstance(nodemailer_use_auth_raw, bool):
-            nodemailer_use_auth = nodemailer_use_auth_raw
-        else:
-            nodemailer_use_auth = str(nodemailer_use_auth_raw).strip().lower() in ('1', 'true', 'yes', 'on')
+            nodemailer_host = (app.config.get('NODEMAILER_HOST') or os.environ.get('NODEMAILER_HOST') or app.config.get('SMTP_HOST') or os.environ.get('SMTP_HOST') or '').strip()
+            nodemailer_user = (app.config.get('NODEMAILER_USER') or os.environ.get('NODEMAILER_USER') or app.config.get('SMTP_USER') or os.environ.get('SMTP_USER') or '').strip()
+            nodemailer_port = (str(app.config.get('NODEMAILER_PORT') or os.environ.get('NODEMAILER_PORT') or app.config.get('SMTP_PORT') or os.environ.get('SMTP_PORT') or '')).strip()
+            email_from = (app.config.get('EMAIL_FROM') or os.environ.get('EMAIL_FROM') or '').strip()
+            nodemailer_pass = (app.config.get('NODEMAILER_PASS') or os.environ.get('NODEMAILER_PASS') or app.config.get('SMTP_PASS') or os.environ.get('SMTP_PASS') or '').strip()
+            nodemailer_use_auth_raw = app.config.get('NODEMAILER_USE_AUTH')
+            if nodemailer_use_auth_raw is None:
+                nodemailer_use_auth_raw = app.config.get('SMTP_USE_AUTH')
+            if isinstance(nodemailer_use_auth_raw, bool):
+                nodemailer_use_auth = nodemailer_use_auth_raw
+            else:
+                nodemailer_use_auth = str(nodemailer_use_auth_raw).strip().lower() in ('1', 'true', 'yes', 'on')
 
-        if email_provider == 'resend':
-            if resend_api_key and email_from:
-                app.logger.info(f'Email provider configured: provider=resend, from={email_from}')
+            if email_provider == 'resend':
+                if resend_api_key and email_from:
+                    app.logger.info(f'Email provider configured: provider=resend, from={email_from}')
+                else:
+                    missing = []
+                    if not resend_api_key:
+                        missing.append('RESEND_API_KEY')
+                    if not email_from:
+                        missing.append('EMAIL_FROM')
+                    app.logger.warning(f'Resend not fully configured - missing fields: {", ".join(missing)}')
+            elif all([nodemailer_host, nodemailer_port, email_from]) and (not nodemailer_use_auth or (nodemailer_user and nodemailer_pass)):
+                app.logger.info(f'Email provider configured: provider=nodemailer, host={nodemailer_host}, user={nodemailer_user}, port={nodemailer_port}, from={email_from}')
             else:
                 missing = []
-                if not resend_api_key:
-                    missing.append('RESEND_API_KEY')
+                if not nodemailer_host:
+                    missing.append('NODEMAILER_HOST')
+                if not nodemailer_port:
+                    missing.append('NODEMAILER_PORT')
                 if not email_from:
                     missing.append('EMAIL_FROM')
-                app.logger.warning(f'Resend not fully configured - missing fields: {", ".join(missing)}')
-        elif all([nodemailer_host, nodemailer_port, email_from]) and (not nodemailer_use_auth or (nodemailer_user and nodemailer_pass)):
-            app.logger.info(f'Email provider configured: provider=nodemailer, host={nodemailer_host}, user={nodemailer_user}, port={nodemailer_port}, from={email_from}')
-        else:
-            missing = []
-            if not nodemailer_host:
-                missing.append('NODEMAILER_HOST')
-            if not nodemailer_port:
-                missing.append('NODEMAILER_PORT')
-            if not email_from:
-                missing.append('EMAIL_FROM')
-            if nodemailer_use_auth and not nodemailer_user:
-                missing.append('NODEMAILER_USER')
-            if nodemailer_use_auth and not nodemailer_pass:
-                missing.append('NODEMAILER_PASS')
-            app.logger.warning(f'NodeMailer not fully configured - missing fields: {", ".join(missing)}')
+                if nodemailer_use_auth and not nodemailer_user:
+                    missing.append('NODEMAILER_USER')
+                if nodemailer_use_auth and not nodemailer_pass:
+                    missing.append('NODEMAILER_PASS')
+                app.logger.warning(f'NodeMailer not fully configured - missing fields: {", ".join(missing)}')
 
-        # Surface email misconfiguration loudly when verification is required.
-        if app.config.get('REQUIRE_EMAIL_VERIFICATION'):
-            if email_provider == 'resend' and not all([resend_api_key, email_from]):
-                app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but Resend is incomplete.')
-            if email_provider != 'resend':
-                nodemailer_ready = all([nodemailer_host, nodemailer_port, email_from]) and (
-                    (not nodemailer_use_auth) or (nodemailer_user and nodemailer_pass)
-                )
-                if not nodemailer_ready:
-                    app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but NodeMailer is incomplete.')
-        app._smtp_logged = True
+            # Surface email misconfiguration loudly when verification is required.
+            if app.config.get('REQUIRE_EMAIL_VERIFICATION'):
+                if email_provider == 'resend' and not all([resend_api_key, email_from]):
+                    app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but Resend is incomplete.')
+                if email_provider != 'resend':
+                    nodemailer_ready = all([nodemailer_host, nodemailer_port, email_from]) and (
+                        (not nodemailer_use_auth) or (nodemailer_user and nodemailer_pass)
+                    )
+                    if not nodemailer_ready:
+                        app.logger.error('REQUIRE_EMAIL_VERIFICATION is enabled but NodeMailer is incomplete.')
+            app._smtp_logged = True
+    except Exception as exc:
+        app.logger.exception(f'Non-fatal before_request email config logging failure: {exc}')
+
+
+@app.errorhandler(500)
+def handle_internal_server_error(exc):
+    app.logger.exception(f'Unhandled Internal Server Error: {exc}')
+    try:
+        db.session.rollback()
+    except Exception:
+        pass
+    flash('Temporary server issue. Please try again in a few seconds.', 'error')
+    return redirect(url_for('login'))
 
 # Simple in-memory user store (for demo only)
 users = {}
