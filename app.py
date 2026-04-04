@@ -1444,6 +1444,38 @@ The SkillForge Team
     )
 
 
+def _send_verification_email_async_for_pending(pending):
+    """Fire-and-forget verification email send so signup requests do not time out."""
+    pending_username = str(getattr(pending, 'username', '') or '')
+    pending_email = str(getattr(pending, 'email', '') or '')
+    pending_token = str(getattr(pending, 'token', '') or '')
+
+    if not pending_email or not pending_token:
+        app.logger.warning('Skipping async verification send due to missing pending email/token.')
+        return
+
+    class PendingEmailPayload:
+        def __init__(self, username, email, token):
+            self.username = username
+            self.email = email
+            self.token = token
+
+    payload = PendingEmailPayload(pending_username, pending_email, pending_token)
+
+    def _worker():
+        with app.app_context():
+            try:
+                sent, err = _send_verification_email_for_pending(payload)
+                if sent:
+                    app.logger.info(f'Async verification email sent to {pending_email}')
+                else:
+                    app.logger.error(f'Async verification email failed for {pending_email}: {err}')
+            except Exception as exc:
+                app.logger.exception(f'Async verification email exception for {pending_email}: {exc}')
+
+    threading.Thread(target=_worker, daemon=True).start()
+
+
 
 
 @app.route('/')
@@ -1544,16 +1576,11 @@ def signup():
             db.session.add(pending)
             db.session.commit()
 
-            sent, error_msg = _send_verification_email_for_pending(pending)
-
             session.pop('csrf_token', None)
-            if sent:
-                flash('Verification email sent successfully. Please check your inbox.', 'info')
-                flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
-                return redirect(url_for('login'))
-
-            flash(f'Registration is pending, but the verification email could not be sent ({error_msg}). Please try again after checking email provider configuration.', 'error')
-            return redirect(url_for('signup'))
+            _send_verification_email_async_for_pending(pending)
+            flash('Registration is pending email verification. Verification email is being sent now; please check inbox/spam in a minute.', 'info')
+            flash(f'Please verify your email within {_email_verification_expiry_minutes()} minutes to activate your account. You can log in only after verification.', 'warning')
+            return redirect(url_for('login'))
         except Exception as exc:
             db.session.rollback()
             app.logger.exception(f'Signup failed: {exc}')
@@ -1639,11 +1666,8 @@ def resend_verification():
         pending.token_created_at = datetime.datetime.utcnow()
         db.session.commit()
 
-        sent, error_msg = _send_verification_email_for_pending(pending)
-        if sent:
-            flash('A new verification email has been sent. Please check your inbox.', 'success')
-        else:
-            flash(f'Could not resend verification email ({error_msg}). Please try again later.', 'error')
+        _send_verification_email_async_for_pending(pending)
+        flash('A new verification email is being sent. Please check your inbox/spam shortly.', 'success')
         return redirect(url_for('login'))
     except Exception as exc:
         db.session.rollback()
